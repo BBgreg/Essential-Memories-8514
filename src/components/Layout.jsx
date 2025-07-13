@@ -6,7 +6,7 @@ import Navbar from './Navbar';
 import ConfettiBackground from './ConfettiBackground';
 import LoadingScreen from './LoadingScreen';
 import { useLocation, useNavigate } from 'react-router-dom';
-import supabase from '../lib/supabase';
+import supabase, { refreshSession } from '../lib/supabase';
 
 const Layout = ({ children }) => {
   const { loading: authLoading, user, authError } = useAuth();
@@ -24,6 +24,9 @@ const Layout = ({ children }) => {
 
   // Force exit from loading state after 10 seconds max
   const [forceExit, setForceExit] = useState(false);
+  
+  // Track if we've attempted a session refresh
+  const [refreshAttempted, setRefreshAttempted] = useState(false);
 
   // Don't show loading screen on auth pages
   const isAuthPage = [
@@ -47,14 +50,14 @@ const Layout = ({ children }) => {
     ].includes(location.pathname);
 
     if ((!authLoading || forceExit) && !user && isProtectedRoute) {
-      console.log('No authenticated user found, redirecting to login page');
+      console.log('[Layout] No authenticated user found, redirecting to login page');
       navigate('/login');
     }
   }, [authLoading, user, location.pathname, navigate, forceExit]);
 
   // Debug logging
   useEffect(() => {
-    console.log('Layout render state:', {
+    console.log('[Layout] Render state:', {
       isAuthPage,
       authLoading,
       memoryLoading,
@@ -63,18 +66,19 @@ const Layout = ({ children }) => {
       dataFetchAttempted,
       currentPath: location.pathname,
       forceExit,
-      loadingDuration
+      loadingDuration,
+      refreshAttempted
     });
     
     // Log current user information
     const currentUser = supabase.auth.currentUser;
     if (currentUser) {
-      console.log('Current authenticated user:', {
+      console.log('[Layout] Current authenticated user:', {
         id: currentUser.id,
         email: currentUser.email
       });
     } else {
-      console.log('No current authenticated user found in Layout component');
+      console.log('[Layout] No current authenticated user found in Layout component');
     }
   }, [
     isAuthPage,
@@ -85,7 +89,8 @@ const Layout = ({ children }) => {
     dataFetchAttempted,
     location.pathname,
     forceExit,
-    loadingDuration
+    loadingDuration,
+    refreshAttempted
   ]);
 
   // Track loading duration and force exit if needed
@@ -95,11 +100,22 @@ const Layout = ({ children }) => {
       const interval = setInterval(() => {
         setLoadingDuration(prev => {
           const newDuration = prev + 1;
+          
+          // Try to refresh the session at 5 seconds if we're still loading and haven't tried yet
+          if (newDuration === 5 && !refreshAttempted) {
+            console.log('[Layout] Loading taking too long, attempting session refresh...');
+            setRefreshAttempted(true);
+            refreshSession().then(success => {
+              console.log('[Layout] Session refresh attempt result:', success);
+            });
+          }
+          
           // Force exit from loading state after 10 seconds
           if (newDuration >= 10 && !forceExit) {
-            console.warn('CRITICAL: Forcing exit from loading state after 10s');
+            console.warn('[Layout] CRITICAL: Forcing exit from loading state after 10s');
             setForceExit(true);
           }
+          
           return newDuration;
         });
       }, 1000);
@@ -109,17 +125,24 @@ const Layout = ({ children }) => {
       // Reset loading duration when we're not loading
       setLoadingDuration(0);
     }
-  }, [authLoading, memoryLoading, user, isAuthPage, forceExit]);
+  }, [authLoading, memoryLoading, user, isAuthPage, forceExit, refreshAttempted]);
 
   // Retry function for auth errors
   const handleRetry = () => {
-    console.log('Retrying after error or timeout...');
-    if (memoryError && retryLoadMemories) {
-      retryLoadMemories();
-    } else {
-      // Force reload as fallback
-      window.location.reload();
-    }
+    console.log('[Layout] Retrying after error or timeout...');
+    
+    // First try to refresh the session
+    refreshSession().then(success => {
+      console.log('[Layout] Session refresh attempt result:', success);
+      
+      // If success, try to reload memories
+      if (success && memoryError && retryLoadMemories) {
+        retryLoadMemories();
+      } else {
+        // Force reload as fallback
+        window.location.reload();
+      }
+    });
   };
 
   // Show loading screen only when necessary

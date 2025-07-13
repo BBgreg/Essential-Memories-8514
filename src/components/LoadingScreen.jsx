@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
+import { refreshSession } from '../lib/supabase';
 
 const { FiLoader, FiAlertCircle, FiRefreshCw } = FiIcons;
 
-const LoadingScreen = ({ 
-  message = 'Loading your memories...', 
-  error = null, 
-  onRetry = null, 
-  showRetry = false 
+const LoadingScreen = ({
+  message = 'Loading your memories...',
+  error = null,
+  onRetry = null,
+  showRetry = false
 }) => {
   const [showRetryButton, setShowRetryButton] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
+  const [refreshAttempted, setRefreshAttempted] = useState(false);
 
   // Show retry button after 3 seconds if still loading
   useEffect(() => {
@@ -25,10 +27,24 @@ const LoadingScreen = ({
   // Track loading time for diagnostics
   useEffect(() => {
     const interval = setInterval(() => {
-      setLoadingTime(prev => prev + 1);
+      setLoadingTime(prev => {
+        const newTime = prev + 1;
+        
+        // At 5 seconds, try auto-refreshing the session if we haven't already
+        if (newTime === 5 && !refreshAttempted && !error) {
+          console.log('[LoadingScreen] Auto-attempting session refresh after 5s');
+          setRefreshAttempted(true);
+          refreshSession().then(success => {
+            console.log('[LoadingScreen] Auto session refresh result:', success);
+          });
+        }
+        
+        return newTime;
+      });
     }, 1000);
+    
     return () => clearInterval(interval);
-  }, []);
+  }, [error, refreshAttempted]);
 
   // Provide detailed error message when loading takes too long
   const getDetailedHelp = () => {
@@ -49,12 +65,13 @@ const LoadingScreen = ({
   };
 
   const handleRetry = () => {
-    console.log('Retry loading requested by user after', loadingTime, 'seconds');
+    console.log('[LoadingScreen] Retry loading requested by user after', loadingTime, 'seconds');
+    
     if (onRetry) onRetry();
     
     // Force page reload as a last resort if loading takes too long
     if (loadingTime > 15) {
-      console.log('Forcing page reload after extended loading time');
+      console.log('[LoadingScreen] Forcing page reload after extended loading time');
       window.location.reload();
     }
   };
@@ -100,7 +117,8 @@ const LoadingScreen = ({
             <SafeIcon icon={FiLoader} className="w-12 h-12 text-vibrant-pink" />
           </motion.div>
           <p className="text-lg font-medium text-text-primary">
-            {message} <span className="text-xs text-gray-400">({loadingTime}s)</span>
+            {message}
+            <span className="text-xs text-gray-400">({loadingTime}s)</span>
           </p>
           {getDetailedHelp()}
           {(showRetryButton || loadingTime > 8) && onRetry && (

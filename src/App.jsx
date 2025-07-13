@@ -25,28 +25,30 @@ import './App.css';
 function App() {
   // Log app initialization for debugging
   useEffect(() => {
-    console.log('App initializing...');
-    console.log('Current URL:', window.location.href);
-    console.log('App Version:', '1.0.1'); // Version tracking for debugging
-    console.log('Build Time:', new Date().toISOString());
-    
+    console.log('[App] Initializing...');
+    console.log('[App] Current URL:', window.location.href);
+    console.log('[App] App Version:', '1.0.2'); // Version tracking for debugging
+    console.log('[App] Build Time:', new Date().toISOString());
+
     // Add window error handler to catch any unhandled errors
     const originalOnError = window.onerror;
     window.onerror = (message, source, lineno, colno, error) => {
-      console.error('Global error caught:', { message, source, lineno, colno, error });
+      console.error('[App] Global error caught:', { message, source, lineno, colno, error });
+      
       // Call the original handler if it exists
       if (originalOnError) return originalOnError(message, source, lineno, colno, error);
       return false;
     };
-    
+
     // Add unhandled promise rejection handler
     const originalOnUnhandledRejection = window.onunhandledrejection;
     window.onunhandledrejection = (event) => {
-      console.error('Unhandled Promise Rejection:', event.reason);
+      console.error('[App] Unhandled Promise Rejection:', event.reason);
+      
       // Call the original handler if it exists
       if (originalOnUnhandledRejection) return originalOnUnhandledRejection(event);
     };
-    
+
     return () => {
       // Restore original handlers on cleanup
       window.onerror = originalOnError;
@@ -67,7 +69,7 @@ function App() {
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
-              
+
               {/* Protected Routes */}
               <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
               <Route path="/add" element={<ProtectedRoute><AddMemory /></ProtectedRoute>} />
@@ -75,7 +77,7 @@ function App() {
               <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
               <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              
+
               {/* Catch-all route */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
