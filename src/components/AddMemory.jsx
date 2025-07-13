@@ -1,63 +1,94 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useMemory } from '../contexts/MemoryContext';
+import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
+import DateField from '../components/DateField';
 
-const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck } = FiIcons;
+const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck, FiAlertCircle } = FiIcons;
 
 const AddMemory = () => {
   const navigate = useNavigate();
   const { addMemory } = useMemory();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     date: '',
     type: 'birthday'
   });
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Verify user authentication
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
   const memoryTypes = [
-    { id: 'birthday', label: 'Birthday', icon: FiGift, color: 'from-pastel-pink to-vibrant-pink' },
-    { id: 'anniversary', label: 'Anniversary', icon: FiHeart, color: 'from-pastel-teal to-vibrant-teal' },
-    { id: 'special', label: 'Special Date', icon: FiStar, color: 'from-pastel-yellow to-vibrant-yellow' },
-    { id: 'holiday', label: 'Holiday', icon: FiCalendar, color: 'from-pastel-purple to-vibrant-purple' }
+    {
+      id: 'birthday',
+      label: 'Birthday',
+      icon: FiGift,
+      color: 'from-pastel-pink to-vibrant-pink'
+    },
+    {
+      id: 'anniversary',
+      label: 'Anniversary',
+      icon: FiHeart,
+      color: 'from-pastel-teal to-vibrant-teal'
+    },
+    {
+      id: 'special',
+      label: 'Special Date',
+      icon: FiStar,
+      color: 'from-pastel-yellow to-vibrant-yellow'
+    },
+    {
+      id: 'holiday',
+      label: 'Holiday',
+      icon: FiCalendar,
+      color: 'from-pastel-purple to-vibrant-purple'
+    }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.name.trim() && formData.date) {
-      // Format the display name for birthdays
-      const displayName = formData.type === 'birthday' 
-        ? `${formData.name.trim()}'s Birthday`
-        : formData.name.trim();
+    if (!user) {
+      setError('You must be logged in to add a memory');
+      return;
+    }
 
-      const memoryData = {
-        ...formData,
-        name: displayName,
-        // Extract only month and day from the date
-        date: formData.date.split('-').slice(1).join('-')
-      };
-      
-      addMemory(memoryData);
+    if (!formData.name.trim() || !formData.date) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      await addMemory(formData);
       setShowSuccess(true);
       setTimeout(() => {
         navigate('/');
       }, 2000);
+    } catch (error) {
+      console.error('Error adding memory:', error);
+      setError(error.message || 'Failed to add memory. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleDateChange = (e) => {
-    const fullDate = e.target.value;
-    // Store only month and day
-    const [_, month, day] = fullDate.split('-');
-    setFormData(prev => ({ 
-      ...prev, 
-      date: `2024-${month}-${day}` // Use any year as placeholder
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
     }));
   };
 
@@ -99,6 +130,18 @@ const AddMemory = () => {
         </div>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 text-red-600 rounded-xl p-4 flex items-center"
+        >
+          <SafeIcon icon={FiAlertCircle} className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{error}</p>
+        </motion.div>
+      )}
+
       {/* Form */}
       <motion.form
         initial={{ opacity: 0, y: 20 }}
@@ -121,22 +164,17 @@ const AddMemory = () => {
           />
           {formData.type === 'birthday' && (
             <p className="text-xs text-text-secondary italic">
-              Will be displayed as "{formData.name ? `${formData.name}'s Birthday` : 'Name\'s Birthday'}"
+              Will be displayed as "{formData.name ? `${formData.name}'s Birthday` : "Name's Birthday"}"
             </p>
           )}
         </div>
 
-        {/* Date Input - Month and Day only */}
-        <div className="space-y-2">
-          <label className="text-text-primary font-semibold">Date (Month and Day)</label>
-          <input
-            type="date"
-            value={formData.date}
-            onChange={handleDateChange}
-            className="w-full p-4 rounded-2xl border border-gray-200 focus:border-vibrant-pink focus:outline-none bg-white/60 backdrop-blur-sm"
-            required
-          />
-        </div>
+        {/* Date Field */}
+        <DateField
+          value={formData.date}
+          onChange={(date) => handleChange('date', date)}
+          label="Date (MM/DD)"
+        />
 
         {/* Type Selection */}
         <div className="space-y-3">
@@ -169,10 +207,10 @@ const AddMemory = () => {
           type="submit"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          disabled={!formData.name.trim() || !formData.date}
+          disabled={isSubmitting || !formData.name.trim() || !formData.date}
           className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Add Memory
+          {isSubmitting ? 'Adding Memory...' : 'Add Memory'}
         </motion.button>
       </motion.form>
     </div>
