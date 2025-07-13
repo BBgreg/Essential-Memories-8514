@@ -8,23 +8,60 @@ const { FiLoader, FiAlertCircle, FiRefreshCw } = FiIcons;
 const LoadingScreen = ({ 
   message = 'Loading your memories...', 
   error = null, 
-  onRetry = null,
-  showRetry = false
+  onRetry = null, 
+  showRetry = false 
 }) => {
   const [showRetryButton, setShowRetryButton] = useState(false);
-  
-  // Show retry button after 10 seconds if still loading
+  const [loadingTime, setLoadingTime] = useState(0);
+
+  // Show retry button after 5 seconds if still loading
   useEffect(() => {
     if (!error) {
-      const timer = setTimeout(() => setShowRetryButton(true), 10000);
+      const timer = setTimeout(() => setShowRetryButton(true), 5000);
       return () => clearTimeout(timer);
     }
   }, [error]);
 
+  // Track loading time for diagnostics
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLoadingTime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Provide detailed error message when loading takes too long
+  const getDetailedHelp = () => {
+    if (loadingTime > 20) {
+      return (
+        <div className="mt-4 text-xs text-text-secondary bg-gray-50 p-3 rounded-lg">
+          <p className="font-medium mb-1">Troubleshooting tips:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>Check your internet connection</li>
+            <li>Try clearing browser cache and cookies</li>
+            <li>Try using a different browser</li>
+            <li>If problem persists, try signing out and back in</li>
+          </ul>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const handleRetry = () => {
+    console.log('Retry loading requested by user');
+    if (onRetry) onRetry();
+    // Force page reload as a last resort if loading takes too long
+    if (loadingTime > 30) {
+      console.log('Forcing page reload after extended loading time');
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center">
       {error ? (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center space-y-4 max-w-sm px-6"
@@ -40,7 +77,7 @@ const LoadingScreen = ({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={onRetry}
+              onClick={handleRetry}
               className="bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-3 px-6 rounded-xl font-semibold shadow-lg mt-4 mx-auto flex items-center"
             >
               <SafeIcon icon={FiRefreshCw} className="w-5 h-5 mr-2" />
@@ -49,7 +86,7 @@ const LoadingScreen = ({
           )}
         </motion.div>
       ) : (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center space-y-4"
@@ -61,14 +98,17 @@ const LoadingScreen = ({
           >
             <SafeIcon icon={FiLoader} className="w-12 h-12 text-vibrant-pink" />
           </motion.div>
-          <p className="text-lg font-medium text-text-primary">{message}</p>
-          {showRetryButton && onRetry && (
+          <p className="text-lg font-medium text-text-primary">
+            {message} <span className="text-xs text-gray-400">({loadingTime}s)</span>
+          </p>
+          {getDetailedHelp()}
+          {(showRetryButton || loadingTime > 15) && onRetry && (
             <motion.button
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={onRetry}
+              onClick={handleRetry}
               className="bg-gray-100 text-text-primary py-2 px-4 rounded-lg font-medium text-sm mx-auto flex items-center mt-4"
             >
               <SafeIcon icon={FiRefreshCw} className="w-4 h-4 mr-2" />

@@ -1,49 +1,88 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useMemory } from '../contexts/MemoryContext';
 import Navbar from './Navbar';
 import ConfettiBackground from './ConfettiBackground';
 import LoadingScreen from './LoadingScreen';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const Layout = ({ children }) => {
-  const { loading: authLoading, user } = useAuth();
+  const { loading: authLoading, user, authError } = useAuth();
   const { 
     loading: memoryLoading, 
-    error: memoryError,
-    dataFetchAttempted,
+    error: memoryError, 
+    dataFetchAttempted, 
     retryLoadMemories 
   } = useMemory();
-  
   const location = useLocation();
-  
+  const navigate = useNavigate();
+
   // Don't show loading screen on auth pages
   const isAuthPage = [
-    '/login', 
-    '/signup', 
-    '/forgot-password', 
-    '/update-password', 
-    '/terms', 
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/update-password',
+    '/terms',
     '/privacy'
   ].includes(location.pathname);
 
+  // Force login redirect if auth check completes and no user is found (for protected routes)
+  useEffect(() => {
+    const isProtectedRoute = ![
+      '/login',
+      '/signup',
+      '/forgot-password',
+      '/update-password',
+      '/terms',
+      '/privacy'
+    ].includes(location.pathname);
+
+    if (!authLoading && !user && isProtectedRoute) {
+      console.log('No authenticated user found, redirecting to login page');
+      navigate('/login');
+    }
+  }, [authLoading, user, location.pathname, navigate]);
+
   // Debug logging
-  console.log('Layout render state:', {
-    isAuthPage,
-    authLoading,
-    memoryLoading,
-    hasUser: !!user,
-    memoryError,
-    dataFetchAttempted,
-    currentPath: location.pathname
-  });
-  
+  useEffect(() => {
+    console.log('Layout render state:', {
+      isAuthPage,
+      authLoading,
+      memoryLoading,
+      hasUser: !!user,
+      memoryError,
+      dataFetchAttempted,
+      currentPath: location.pathname
+    });
+  }, [isAuthPage, authLoading, memoryLoading, user, memoryError, dataFetchAttempted, location.pathname]);
+
+  // Retry function for auth errors
+  const handleRetry = () => {
+    console.log('Retrying after error...');
+    if (memoryError && retryLoadMemories) {
+      retryLoadMemories();
+    } else {
+      // Force reload as fallback
+      window.location.reload();
+    }
+  };
+
   // Show loading screen only when necessary
   const showLoading = !isAuthPage && (authLoading || (memoryLoading && user));
-  
+
   // Show error only on protected pages when data fetch was attempted
-  const showError = !isAuthPage && memoryError && dataFetchAttempted;
+  const showError = !isAuthPage && (memoryError || authError) && dataFetchAttempted;
+
+  // Loading message based on what's actually happening
+  const loadingMessage = authLoading 
+    ? "Checking authentication..." 
+    : memoryLoading 
+      ? "Loading your memories..." 
+      : "Initializing app...";
+
+  const errorMessage = memoryError || authError || "There was a problem loading the app.";
 
   return (
     <div className="app-container min-h-screen relative">
@@ -51,14 +90,16 @@ const Layout = ({ children }) => {
       
       {showLoading && (
         <LoadingScreen 
-          message={authLoading ? "Checking authentication..." : "Loading your memories..."}
+          message={loadingMessage} 
+          onRetry={handleRetry}
+          showRetry={true}
         />
       )}
       
       {showError && (
         <LoadingScreen 
-          error={memoryError}
-          onRetry={retryLoadMemories}
+          error={errorMessage} 
+          onRetry={handleRetry}
           showRetry={true}
         />
       )}
