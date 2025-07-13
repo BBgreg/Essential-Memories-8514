@@ -30,7 +30,26 @@ supabase.auth.getSession().then(({ data, error }) => {
     console.error('Initial session check failed:', error);
   } else {
     console.log('Initial session check success, user:', data.session?.user ? 'Found' : 'None');
+    
+    // Log additional information about the current user
+    const currentUser = supabase.auth.currentUser;
+    if (currentUser) {
+      console.log('Current user ID:', currentUser.id);
+      console.log('Current user email:', currentUser.email);
+    } else {
+      console.log('No current user found');
+    }
   }
 });
+
+// Add a helper method to check current auth status
+export const getCurrentUserId = () => {
+  const currentUser = supabase.auth.currentUser;
+  if (!currentUser) {
+    console.error('No authenticated user found in session');
+    return null;
+  }
+  return currentUser.id;
+};
 
 export default supabase;

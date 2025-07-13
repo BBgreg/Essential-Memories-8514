@@ -35,6 +35,7 @@ export const MemoryProvider = ({ children }) => {
   // Verify user authentication and profile existence
   const verifyUserProfile = async () => {
     if (!user?.id) {
+      console.error('No authenticated user found');
       throw new Error('No authenticated user found');
     }
 
@@ -93,15 +94,23 @@ export const MemoryProvider = ({ children }) => {
       setError(null);
       console.log('Adding memory:', memoryData);
 
-      // Verify user authentication and profile
-      const userId = await verifyUserProfile();
+      // CRITICAL: Verify we have a valid user ID from the current session
+      const currentUser = supabase.auth.currentUser;
+      if (!currentUser || !currentUser.id) {
+        console.error('No authenticated user found in current session');
+        throw new Error('You must be logged in to add a memory. Please try logging out and back in.');
+      }
+      
+      // Use the explicit user ID from the current auth session
+      const userId = currentUser.id;
+      console.log('Using authenticated user ID for memory:', userId);
 
       // Parse date
       const { month, day } = parseDateToDb(memoryData.date);
 
       // Prepare memory data
       const memoryToInsert = {
-        user_id: userId,
+        user_id: userId, // CRITICAL: Use the explicit user ID
         name: memoryData.name.trim(),
         display_name: memoryData.type === 'birthday' 
           ? `${memoryData.name.trim()}'s Birthday` 
@@ -111,7 +120,7 @@ export const MemoryProvider = ({ children }) => {
         category: memoryData.type
       };
 
-      console.log('Attempting to insert memory:', {
+      console.log('Attempting to insert memory with data:', {
         ...memoryToInsert,
         user_id: `${memoryToInsert.user_id.substring(0, 8)}...` // Log partial UUID for privacy
       });
@@ -125,8 +134,15 @@ export const MemoryProvider = ({ children }) => {
 
       if (insertError) {
         console.error('Error inserting memory:', insertError);
-        throw new Error(insertError.message);
+        throw new Error(`Failed to save memory: ${insertError.message}`);
       }
+
+      if (!data) {
+        console.error('No data returned from insert operation');
+        throw new Error('Memory was not saved properly. Please try again.');
+      }
+
+      console.log('Memory inserted successfully, returned data:', data);
 
       // Update local state
       const newMemory = {
@@ -157,6 +173,15 @@ export const MemoryProvider = ({ children }) => {
         return;
       }
 
+      // Get the current user ID directly from auth
+      const currentUser = supabase.auth.currentUser;
+      if (!currentUser || !currentUser.id) {
+        console.error('No authenticated user found in current session during loadMemories');
+        throw new Error('Authentication session error. Please try logging out and back in.');
+      }
+      
+      console.log('Using authenticated user ID for loading memories:', currentUser.id);
+
       // Verify user profile first
       await verifyUserProfile();
 
@@ -164,7 +189,7 @@ export const MemoryProvider = ({ children }) => {
       const { data, error: fetchError } = await supabase
         .from('dates')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', currentUser.id); // CRITICAL: Use the explicit user ID
 
       if (fetchError) {
         console.error('Error fetching memories:', fetchError);
@@ -204,11 +229,18 @@ export const MemoryProvider = ({ children }) => {
     if (!user?.id) return;
 
     try {
-      console.log('Loading streaks for user:', user.id);
+      // Get the current user ID directly from auth
+      const currentUser = supabase.auth.currentUser;
+      if (!currentUser || !currentUser.id) {
+        console.error('No authenticated user found in current session during loadStreaks');
+        return;
+      }
+      
+      console.log('Loading streaks for user:', currentUser.id);
       const { data, error } = await supabase
         .from('streak_data')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id) // CRITICAL: Use the explicit user ID
         .single();
 
       if (error && error.code !== 'PGRST116') {

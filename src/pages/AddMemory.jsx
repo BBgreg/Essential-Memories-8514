@@ -5,8 +5,9 @@ import { useMemory } from '../contexts/MemoryContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import DateField from '../components/DateField';
+import supabase from '../lib/supabase';
 
-const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck } = FiIcons;
+const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck, FiAlertCircle } = FiIcons;
 
 const AddMemory = () => {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ const AddMemory = () => {
     type: 'birthday'
   });
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const memoryTypes = [
     { id: 'birthday', label: 'Birthday', icon: FiGift, color: 'from-pastel-pink to-vibrant-pink' },
@@ -25,30 +28,60 @@ const AddMemory = () => {
     { id: 'holiday', label: 'Holiday', icon: FiCalendar, color: 'from-pastel-purple to-vibrant-purple' }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.name.trim() && formData.date) {
-      // Format the display name for birthdays
-      const displayName = formData.type === 'birthday' 
-        ? `${formData.name.trim()}'s Birthday` 
-        : formData.name.trim();
-        
-      const memoryData = {
-        ...formData,
-        name: formData.name.trim(),  // Store the plain name in the memory object
-        type: formData.type
-      };
+    
+    // CRITICAL: Verify current user is authenticated
+    const currentUser = supabase.auth.currentUser;
+    
+    if (!currentUser || !currentUser.id) {
+      console.error('No authenticated user found in current session during form submit');
+      setError('You must be logged in to add a memory. Please try logging out and back in.');
+      return;
+    }
+    
+    console.log('Current authenticated user ID:', currentUser.id);
+    
+    if (!formData.name.trim() || !formData.date) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+    
+    try {
+      console.log('Adding memory with user ID:', currentUser.id);
+      console.log('Memory data:', formData);
       
-      addMemory(memoryData);
+      const result = await addMemory({
+        ...formData,
+        userId: currentUser.id // Explicitly pass the user ID to ensure it's used
+      });
+      
+      console.log('Memory added result:', result);
+      
+      if (!result || !result.id) {
+        throw new Error('Failed to add memory. Please try again.');
+      }
+      
       setShowSuccess(true);
       setTimeout(() => {
         navigate('/');
       }, 2000);
+    } catch (error) {
+      console.error('Error adding memory:', error);
+      setError(error.message || 'Failed to add memory. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   if (showSuccess) {
@@ -64,7 +97,8 @@ const AddMemory = () => {
           </div>
           <h2 className="text-2xl font-bold text-text-primary">Memory Added!</h2>
           <p className="text-text-secondary">
-            {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been saved successfully.
+            {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been
+            saved successfully.
           </p>
           <div className="text-sm text-text-secondary">
             Date: {formData.date} (MM/DD)
@@ -92,6 +126,18 @@ const AddMemory = () => {
         </div>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 text-red-600 rounded-xl p-4 flex items-center"
+        >
+          <SafeIcon icon={FiAlertCircle} className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{error}</p>
+        </motion.div>
+      )}
+
       {/* Form */}
       <motion.form
         initial={{ opacity: 0, y: 20 }}
@@ -108,9 +154,11 @@ const AddMemory = () => {
             type="text"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            placeholder={formData.type === 'birthday' 
-              ? 'e.g., John Smith' 
-              : 'e.g., Wedding Anniversary, Christmas'}
+            placeholder={
+              formData.type === 'birthday'
+                ? 'e.g., John Smith'
+                : 'e.g., Wedding Anniversary, Christmas'
+            }
             className="w-full p-4 rounded-2xl border border-gray-200 focus:border-vibrant-pink focus:outline-none bg-white/60 backdrop-blur-sm"
             required
           />
@@ -159,10 +207,10 @@ const AddMemory = () => {
           type="submit"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          disabled={!formData.name.trim() || !formData.date}
+          disabled={isSubmitting || !formData.name.trim() || !formData.date}
           className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Add Memory
+          {isSubmitting ? 'Adding Memory...' : 'Add Memory'}
         </motion.button>
       </motion.form>
     </div>

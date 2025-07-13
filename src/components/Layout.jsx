@@ -6,24 +6,25 @@ import Navbar from './Navbar';
 import ConfettiBackground from './ConfettiBackground';
 import LoadingScreen from './LoadingScreen';
 import { useLocation, useNavigate } from 'react-router-dom';
+import supabase from '../lib/supabase';
 
 const Layout = ({ children }) => {
   const { loading: authLoading, user, authError } = useAuth();
-  const { 
-    loading: memoryLoading, 
-    error: memoryError, 
-    dataFetchAttempted, 
-    retryLoadMemories 
+  const {
+    loading: memoryLoading,
+    error: memoryError,
+    dataFetchAttempted,
+    retryLoadMemories
   } = useMemory();
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   // Track how long we've been in the loading state
   const [loadingDuration, setLoadingDuration] = useState(0);
-  
+
   // Force exit from loading state after 10 seconds max
   const [forceExit, setForceExit] = useState(false);
-  
+
   // Don't show loading screen on auth pages
   const isAuthPage = [
     '/login',
@@ -64,18 +65,29 @@ const Layout = ({ children }) => {
       forceExit,
       loadingDuration
     });
+    
+    // Log current user information
+    const currentUser = supabase.auth.currentUser;
+    if (currentUser) {
+      console.log('Current authenticated user:', {
+        id: currentUser.id,
+        email: currentUser.email
+      });
+    } else {
+      console.log('No current authenticated user found in Layout component');
+    }
   }, [
-    isAuthPage, 
-    authLoading, 
-    memoryLoading, 
-    user, 
-    memoryError, 
-    dataFetchAttempted, 
-    location.pathname, 
+    isAuthPage,
+    authLoading,
+    memoryLoading,
+    user,
+    memoryError,
+    dataFetchAttempted,
+    location.pathname,
     forceExit,
     loadingDuration
   ]);
-  
+
   // Track loading duration and force exit if needed
   useEffect(() => {
     // Only track loading time if we're actually in a loading state
@@ -91,7 +103,7 @@ const Layout = ({ children }) => {
           return newDuration;
         });
       }, 1000);
-      
+
       return () => clearInterval(interval);
     } else {
       // Reset loading duration when we're not loading
@@ -117,11 +129,11 @@ const Layout = ({ children }) => {
   const showError = !isAuthPage && (memoryError || authError) && (dataFetchAttempted || forceExit);
 
   // Loading message based on what's actually happening
-  const loadingMessage = authLoading 
-    ? "Checking authentication..." 
-    : memoryLoading 
-      ? "Loading your memories..." 
-      : "Initializing app...";
+  const loadingMessage = authLoading
+    ? "Checking authentication..."
+    : memoryLoading
+    ? "Loading your memories..."
+    : "Initializing app...";
 
   const errorMessage = memoryError || authError || "There was a problem loading the app.";
 
@@ -132,16 +144,16 @@ const Layout = ({ children }) => {
       {showLoading && (
         <LoadingScreen 
           message={loadingMessage} 
-          onRetry={handleRetry}
-          showRetry={loadingDuration > 3}
+          onRetry={handleRetry} 
+          showRetry={loadingDuration > 3} 
         />
       )}
       
       {showError && (
         <LoadingScreen 
           error={errorMessage} 
-          onRetry={handleRetry}
-          showRetry={true}
+          onRetry={handleRetry} 
+          showRetry={true} 
         />
       )}
       
@@ -152,9 +164,7 @@ const Layout = ({ children }) => {
           transition={{ duration: 0.5 }}
           className="relative z-10"
         >
-          <main className="pb-20">
-            {children}
-          </main>
+          <main className="pb-20">{children}</main>
           {!isAuthPage && <Navbar />}
         </motion.div>
       ) : null}

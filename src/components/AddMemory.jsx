@@ -30,30 +30,10 @@ const AddMemory = () => {
   }, [user, navigate]);
 
   const memoryTypes = [
-    {
-      id: 'birthday',
-      label: 'Birthday',
-      icon: FiGift,
-      color: 'from-pastel-pink to-vibrant-pink'
-    },
-    {
-      id: 'anniversary',
-      label: 'Anniversary',
-      icon: FiHeart,
-      color: 'from-pastel-teal to-vibrant-teal'
-    },
-    {
-      id: 'special',
-      label: 'Special Date',
-      icon: FiStar,
-      color: 'from-pastel-yellow to-vibrant-yellow'
-    },
-    {
-      id: 'holiday',
-      label: 'Holiday',
-      icon: FiCalendar,
-      color: 'from-pastel-purple to-vibrant-purple'
-    }
+    { id: 'birthday', label: 'Birthday', icon: FiGift, color: 'from-pastel-pink to-vibrant-pink' },
+    { id: 'anniversary', label: 'Anniversary', icon: FiHeart, color: 'from-pastel-teal to-vibrant-teal' },
+    { id: 'special', label: 'Special Date', icon: FiStar, color: 'from-pastel-yellow to-vibrant-yellow' },
+    { id: 'holiday', label: 'Holiday', icon: FiCalendar, color: 'from-pastel-purple to-vibrant-purple' }
   ];
 
   const handleSubmit = async (e) => {
@@ -70,9 +50,16 @@ const AddMemory = () => {
 
     setIsSubmitting(true);
     setError('');
-
+    
     try {
-      await addMemory(formData);
+      console.log('Adding memory with user ID:', user.id);
+      console.log('Memory data:', formData);
+      
+      await addMemory({
+        ...formData,
+        userId: user.id // Explicitly pass the user ID to ensure it's used in the database operation
+      });
+      
       setShowSuccess(true);
       setTimeout(() => {
         navigate('/');
@@ -105,7 +92,8 @@ const AddMemory = () => {
           </div>
           <h2 className="text-2xl font-bold text-text-primary">Memory Added!</h2>
           <p className="text-text-secondary">
-            {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been saved successfully.
+            {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been
+            saved successfully.
           </p>
         </motion.div>
       </div>
@@ -158,7 +146,11 @@ const AddMemory = () => {
             type="text"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            placeholder={formData.type === 'birthday' ? 'e.g., John Smith' : 'e.g., Wedding Anniversary, Christmas'}
+            placeholder={
+              formData.type === 'birthday'
+                ? 'e.g., John Smith'
+                : 'e.g., Wedding Anniversary, Christmas'
+            }
             className="w-full p-4 rounded-2xl border border-gray-200 focus:border-vibrant-pink focus:outline-none bg-white/60 backdrop-blur-sm"
             required
           />
