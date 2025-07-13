@@ -10,16 +10,25 @@ const { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle } = FiIcons;
 const Login = () => {
   const navigate = useNavigate();
   const { signIn, authError, clearAuthError, user, loading } = useAuth();
-  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  console.log('Login component rendering, current state:', {
+    email,
+    isSubmitting,
+    authError,
+    formError,
+    hasUser: !!user,
+    loading
+  });
+
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
+      console.log('User already logged in, redirecting to home');
       navigate('/');
     }
   }, [user, navigate]);
@@ -55,32 +64,55 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Login form submitted');
     
-    if (!validateForm()) return;
-    
+    if (!validateForm()) {
+      console.log('Form validation failed:', formError);
+      return;
+    }
+
     setIsSubmitting(true);
-    
+    setFormError('');
+    clearAuthError();
+
+    console.log('Attempting to sign in user with email:', email);
+
     try {
       const result = await signIn(email, password);
+      console.log('Login result:', result);
       
-      if (result) {
-        // Success! The user will be redirected in the useEffect
+      if (result && result.user) {
+        console.log('Login successful for user:', result.user.id);
+        console.log('Redirecting to home page...');
+        
+        // Force immediate redirect to home
+        navigate('/', { replace: true });
+      } else if (result && result.error) {
+        console.error('Login failed with error:', result.error);
+        setFormError(result.error.message || 'Login failed. Please try again.');
+      } else {
+        console.error('Login failed with no result or user');
+        setFormError('Login failed. Please check your credentials and try again.');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login error caught:', error);
+      setFormError(error.message || 'Login failed. Please try again.');
     } finally {
+      console.log('Login attempt completed, setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };
 
   if (loading) {
+    console.log('Auth is loading, not rendering login form yet');
     return null; // Will show the LoadingScreen from Layout
   }
 
+  console.log('Rendering login form');
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -92,7 +124,7 @@ const Login = () => {
           </div>
 
           {(authError || formError) && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="bg-red-50 text-red-600 rounded-xl p-4 mb-6 flex items-center"
@@ -139,15 +171,12 @@ const Login = () => {
                   className="absolute inset-y-0 right-0 pr-4 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  <SafeIcon 
-                    icon={showPassword ? FiEyeOff : FiEye} 
-                    className="w-5 h-5 text-text-secondary"
-                  />
+                  <SafeIcon icon={showPassword ? FiEyeOff : FiEye} className="w-5 h-5 text-text-secondary" />
                 </button>
               </div>
               <div className="text-right">
-                <Link 
-                  to="/forgot-password" 
+                <Link
+                  to="/forgot-password"
                   className="text-sm text-vibrant-pink hover:underline"
                 >
                   Forgot Password?

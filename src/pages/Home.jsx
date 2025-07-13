@@ -14,11 +14,17 @@ const Home = () => {
     memories, 
     streaks, 
     getUpcomingDates, 
-    getDisplayName,
+    getDisplayName, 
+    dataFetchAttempted, 
+    error 
+  } = useMemory();
+
+  console.log('Home component rendering, state:', {
+    memoriesCount: memories.length,
     dataFetchAttempted,
     error
-  } = useMemory();
-  
+  });
+
   const upcomingDates = getUpcomingDates().slice(0, 3); // Show only 3 dates
 
   const StatCard = ({ title, value, subtitle, icon, color }) => (
@@ -37,36 +43,27 @@ const Home = () => {
 
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'birthday':
-        return FiIcons.FiGift;
-      case 'anniversary':
-        return FiIcons.FiHeart;
-      case 'special':
-        return FiIcons.FiStar;
-      case 'holiday':
-        return FiIcons.FiCalendar;
-      default:
-        return FiIcons.FiCalendar;
+      case 'birthday': return FiIcons.FiGift;
+      case 'anniversary': return FiIcons.FiHeart;
+      case 'special': return FiIcons.FiStar;
+      case 'holiday': return FiIcons.FiCalendar;
+      default: return FiIcons.FiCalendar;
     }
   };
 
   const getTypeColor = (type) => {
     switch (type) {
-      case 'birthday':
-        return 'from-pastel-pink to-vibrant-pink';
-      case 'anniversary':
-        return 'from-pastel-teal to-vibrant-teal';
-      case 'special':
-        return 'from-pastel-yellow to-vibrant-yellow';
-      case 'holiday':
-        return 'from-pastel-purple to-vibrant-purple';
-      default:
-        return 'from-gray-300 to-gray-500';
+      case 'birthday': return 'from-pastel-pink to-vibrant-pink';
+      case 'anniversary': return 'from-pastel-teal to-vibrant-teal';
+      case 'special': return 'from-pastel-yellow to-vibrant-yellow';
+      case 'holiday': return 'from-pastel-purple to-vibrant-purple';
+      default: return 'from-gray-300 to-gray-500';
     }
   };
 
   // If there was an error fetching data but the loading state is complete
   if (error && dataFetchAttempted) {
+    console.log('Rendering error state in Home component');
     return (
       <div className="p-6 flex items-center justify-center min-h-screen">
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl max-w-sm w-full text-center space-y-4">
@@ -92,6 +89,7 @@ const Home = () => {
     );
   }
 
+  console.log('Rendering main Home content');
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
