@@ -27,6 +27,8 @@ function App() {
   useEffect(() => {
     console.log('App initializing...');
     console.log('Current URL:', window.location.href);
+    console.log('App Version:', '1.0.1'); // Version tracking for debugging
+    console.log('Build Time:', new Date().toISOString());
     
     // Add window error handler to catch any unhandled errors
     const originalOnError = window.onerror;
@@ -37,9 +39,18 @@ function App() {
       return false;
     };
     
+    // Add unhandled promise rejection handler
+    const originalOnUnhandledRejection = window.onunhandledrejection;
+    window.onunhandledrejection = (event) => {
+      console.error('Unhandled Promise Rejection:', event.reason);
+      // Call the original handler if it exists
+      if (originalOnUnhandledRejection) return originalOnUnhandledRejection(event);
+    };
+    
     return () => {
-      // Restore original handler on cleanup
+      // Restore original handlers on cleanup
       window.onerror = originalOnError;
+      window.onunhandledrejection = originalOnUnhandledRejection;
     };
   }, []);
 

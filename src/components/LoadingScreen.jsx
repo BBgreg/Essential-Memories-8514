@@ -14,10 +14,10 @@ const LoadingScreen = ({
   const [showRetryButton, setShowRetryButton] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
 
-  // Show retry button after 5 seconds if still loading
+  // Show retry button after 3 seconds if still loading
   useEffect(() => {
     if (!error) {
-      const timer = setTimeout(() => setShowRetryButton(true), 5000);
+      const timer = setTimeout(() => setShowRetryButton(true), 3000);
       return () => clearTimeout(timer);
     }
   }, [error]);
@@ -32,7 +32,7 @@ const LoadingScreen = ({
 
   // Provide detailed error message when loading takes too long
   const getDetailedHelp = () => {
-    if (loadingTime > 20) {
+    if (loadingTime > 10) {
       return (
         <div className="mt-4 text-xs text-text-secondary bg-gray-50 p-3 rounded-lg">
           <p className="font-medium mb-1">Troubleshooting tips:</p>
@@ -49,10 +49,11 @@ const LoadingScreen = ({
   };
 
   const handleRetry = () => {
-    console.log('Retry loading requested by user');
+    console.log('Retry loading requested by user after', loadingTime, 'seconds');
     if (onRetry) onRetry();
+    
     // Force page reload as a last resort if loading takes too long
-    if (loadingTime > 30) {
+    if (loadingTime > 15) {
       console.log('Forcing page reload after extended loading time');
       window.location.reload();
     }
@@ -102,7 +103,7 @@ const LoadingScreen = ({
             {message} <span className="text-xs text-gray-400">({loadingTime}s)</span>
           </p>
           {getDetailedHelp()}
-          {(showRetryButton || loadingTime > 15) && onRetry && (
+          {(showRetryButton || loadingTime > 8) && onRetry && (
             <motion.button
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

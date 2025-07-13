@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useMemory } from '../contexts/MemoryContext';
@@ -17,7 +17,13 @@ const Layout = ({ children }) => {
   } = useMemory();
   const location = useLocation();
   const navigate = useNavigate();
-
+  
+  // Track how long we've been in the loading state
+  const [loadingDuration, setLoadingDuration] = useState(0);
+  
+  // Force exit from loading state after 10 seconds max
+  const [forceExit, setForceExit] = useState(false);
+  
   // Don't show loading screen on auth pages
   const isAuthPage = [
     '/login',
@@ -39,11 +45,11 @@ const Layout = ({ children }) => {
       '/privacy'
     ].includes(location.pathname);
 
-    if (!authLoading && !user && isProtectedRoute) {
+    if ((!authLoading || forceExit) && !user && isProtectedRoute) {
       console.log('No authenticated user found, redirecting to login page');
       navigate('/login');
     }
-  }, [authLoading, user, location.pathname, navigate]);
+  }, [authLoading, user, location.pathname, navigate, forceExit]);
 
   // Debug logging
   useEffect(() => {
@@ -54,13 +60,48 @@ const Layout = ({ children }) => {
       hasUser: !!user,
       memoryError,
       dataFetchAttempted,
-      currentPath: location.pathname
+      currentPath: location.pathname,
+      forceExit,
+      loadingDuration
     });
-  }, [isAuthPage, authLoading, memoryLoading, user, memoryError, dataFetchAttempted, location.pathname]);
+  }, [
+    isAuthPage, 
+    authLoading, 
+    memoryLoading, 
+    user, 
+    memoryError, 
+    dataFetchAttempted, 
+    location.pathname, 
+    forceExit,
+    loadingDuration
+  ]);
+  
+  // Track loading duration and force exit if needed
+  useEffect(() => {
+    // Only track loading time if we're actually in a loading state
+    if ((authLoading || (memoryLoading && user)) && !isAuthPage) {
+      const interval = setInterval(() => {
+        setLoadingDuration(prev => {
+          const newDuration = prev + 1;
+          // Force exit from loading state after 10 seconds
+          if (newDuration >= 10 && !forceExit) {
+            console.warn('CRITICAL: Forcing exit from loading state after 10s');
+            setForceExit(true);
+          }
+          return newDuration;
+        });
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    } else {
+      // Reset loading duration when we're not loading
+      setLoadingDuration(0);
+    }
+  }, [authLoading, memoryLoading, user, isAuthPage, forceExit]);
 
   // Retry function for auth errors
   const handleRetry = () => {
-    console.log('Retrying after error...');
+    console.log('Retrying after error or timeout...');
     if (memoryError && retryLoadMemories) {
       retryLoadMemories();
     } else {
@@ -70,10 +111,10 @@ const Layout = ({ children }) => {
   };
 
   // Show loading screen only when necessary
-  const showLoading = !isAuthPage && (authLoading || (memoryLoading && user));
+  const showLoading = !isAuthPage && !forceExit && (authLoading || (memoryLoading && user));
 
   // Show error only on protected pages when data fetch was attempted
-  const showError = !isAuthPage && (memoryError || authError) && dataFetchAttempted;
+  const showError = !isAuthPage && (memoryError || authError) && (dataFetchAttempted || forceExit);
 
   // Loading message based on what's actually happening
   const loadingMessage = authLoading 
@@ -92,7 +133,7 @@ const Layout = ({ children }) => {
         <LoadingScreen 
           message={loadingMessage} 
           onRetry={handleRetry}
-          showRetry={true}
+          showRetry={loadingDuration > 3}
         />
       )}
       
@@ -104,7 +145,7 @@ const Layout = ({ children }) => {
         />
       )}
       
-      {!showLoading && !showError && (
+      {(!showLoading && !showError) || forceExit ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -116,7 +157,7 @@ const Layout = ({ children }) => {
           </main>
           {!isAuthPage && <Navbar />}
         </motion.div>
-      )}
+      ) : null}
     </div>
   );
 };

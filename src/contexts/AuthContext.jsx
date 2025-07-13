@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import supabase from '../lib/supabase';
 
 const AuthContext = createContext({
@@ -29,6 +29,19 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [authInitialized, setAuthInitialized] = useState(false);
+  
+  // Use a ref to track if we've already set loading to false
+  // This prevents race conditions when multiple auth events fire
+  const loadingSetToFalse = useRef(false);
+
+  // Safe way to set loading to false only once
+  const safeSetLoadingFalse = () => {
+    if (!loadingSetToFalse.current) {
+      console.log('Setting loading to FALSE');
+      setLoading(false);
+      loadingSetToFalse.current = true;
+    }
+  };
 
   // Clear any auth errors
   const clearAuthError = () => setAuthError(null);
@@ -36,7 +49,7 @@ export const AuthProvider = ({ children }) => {
   // Load user profile from the profiles table
   const loadUserProfile = async (userId) => {
     try {
-      console.log('Loading profile for user:', userId.substring(0, 8) + '...');
+      console.log('Loading profile for user:', userId);
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -45,17 +58,20 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         console.error('Error loading profile:', error);
-        throw error;
+        return null;
       }
       
       if (profile) {
         console.log('Profile loaded successfully');
         setProfile(profile);
+        return profile;
       } else {
         console.log('No profile found for user');
+        return null;
       }
     } catch (error) {
       console.error('Error in loadUserProfile:', error);
+      return null;
     }
   };
 
@@ -64,81 +80,114 @@ export const AuthProvider = ({ children }) => {
     let mounted = true;
     console.log('AuthProvider initializing...');
 
-    const initializeAuth = async () => {
-      try {
-        console.log('Getting initial session...');
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Session retrieval error:', error);
-          throw error;
-        }
-        
-        if (mounted) {
-          if (session?.user) {
-            console.log('Initial session found for user:', session.user.id.substring(0, 8) + '...');
-            setUser(session.user);
-            await loadUserProfile(session.user.id);
-          } else {
-            console.log('No initial session found');
-          }
-          // Important: Set loading to false AFTER processing the initial session
-          setLoading(false);
-          setAuthInitialized(true);
-          console.log('Auth initialization complete');
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        setAuthError(error.message);
-        if (mounted) {
-          // Important: Set loading to false even if there was an error
-          setLoading(false);
+    // Force loading state to false after 8 seconds no matter what
+    // This is a safety mechanism to prevent permanent loading state
+    const hardTimeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('HARD TIMEOUT: Forcing auth loading state to false after 8s');
+        safeSetLoadingFalse();
+        if (!authInitialized) {
           setAuthInitialized(true);
         }
       }
-    };
+    }, 8000);
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state change event:', event);
-        console.log('Session user ID:', session?.user?.id ? (session.user.id.substring(0, 8) + '...') : 'No user');
+        console.log('Auth state change event:', event, 'Session exists:', !!session);
         
         if (mounted) {
           if (session?.user) {
+            console.log('User found in session:', session.user.id);
             setUser(session.user);
-            await loadUserProfile(session.user.id);
+            
+            // Load profile in the background but don't wait for it
+            loadUserProfile(session.user.id).catch(err => {
+              console.error('Profile load failed but continuing:', err);
+            });
           } else {
+            console.log('No user in session');
             setUser(null);
             setProfile(null);
           }
           
-          // Important: Set loading to false after processing auth state changes
-          // but only if this is the INITIAL_SESSION event or we've already initialized
-          if (event === 'INITIAL_SESSION' || authInitialized) {
-            setLoading(false);
+          // Any auth event means we're initialized
+          if (!authInitialized) {
             setAuthInitialized(true);
-            console.log('Auth state updated, loading set to false');
           }
+          
+          // IMPORTANT: Set loading to false after receiving any auth event
+          // This ensures we don't get stuck in loading state
+          safeSetLoadingFalse();
         }
       }
     );
 
-    initializeAuth();
+    // Get the initial session directly - this is crucial as a backup
+    // in case the onAuthStateChange event doesn't fire properly
+    const getInitialSession = async () => {
+      try {
+        console.log('Getting initial session directly...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Direct session retrieval error:', error);
+          if (mounted) {
+            setAuthError('Failed to check authentication status');
+            safeSetLoadingFalse();
+            setAuthInitialized(true);
+          }
+          return;
+        }
+        
+        if (mounted) {
+          if (session?.user) {
+            console.log('Initial direct session found for user:', session.user.id);
+            setUser(session.user);
+            
+            // Load profile but don't wait for it
+            loadUserProfile(session.user.id).catch(err => {
+              console.error('Initial profile load failed but continuing:', err);
+            });
+          } else {
+            console.log('No initial direct session found');
+            setUser(null);
+          }
+          
+          // Always initialize and stop loading after direct session check
+          setAuthInitialized(true);
+          safeSetLoadingFalse();
+        }
+      } catch (error) {
+        console.error('Error in direct session check:', error);
+        if (mounted) {
+          setAuthError('Authentication check failed');
+          safeSetLoadingFalse();
+          setAuthInitialized(true);
+        }
+      }
+    };
+    
+    // Execute the initial session check
+    getInitialSession();
 
-    // Add a safety timeout to ensure loading state doesn't get stuck
+    // Add a shorter safety timeout to ensure loading state doesn't get stuck
     const safetyTimeout = setTimeout(() => {
       if (mounted && loading) {
-        console.log('Safety timeout triggered - forcing loading to false');
-        setLoading(false);
-        setAuthInitialized(true);
+        console.warn('Safety timeout triggered after 5s - forcing loading to false');
+        safeSetLoadingFalse();
+        if (!authInitialized) {
+          setAuthInitialized(true);
+        }
       }
-    }, 10000); // 10 seconds safety timeout
+    }, 5000);
 
     return () => {
       mounted = false;
       subscription?.unsubscribe();
       clearTimeout(safetyTimeout);
+      clearTimeout(hardTimeoutId);
     };
   }, []);
 
@@ -147,6 +196,8 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       setLoading(true);
+      loadingSetToFalse.current = false;
+      
       console.log('Signing up user with email:', email);
       
       const { data, error } = await supabase.auth.signUp({
@@ -169,6 +220,7 @@ export const AuthProvider = ({ children }) => {
       return null;
     } finally {
       setLoading(false);
+      loadingSetToFalse.current = false;
     }
   };
 
@@ -177,6 +229,8 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       setLoading(true);
+      loadingSetToFalse.current = false;
+      
       console.log('Signing in user with email:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -196,6 +250,7 @@ export const AuthProvider = ({ children }) => {
       return null;
     } finally {
       setLoading(false);
+      loadingSetToFalse.current = false;
     }
   };
 
@@ -204,6 +259,8 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       setLoading(true);
+      loadingSetToFalse.current = false;
+      
       console.log('Signing out user');
       
       const { error } = await supabase.auth.signOut();
@@ -218,6 +275,7 @@ export const AuthProvider = ({ children }) => {
       setAuthError(error.message);
     } finally {
       setLoading(false);
+      loadingSetToFalse.current = false;
     }
   };
 
@@ -226,6 +284,8 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       setLoading(true);
+      loadingSetToFalse.current = false;
+      
       console.log('Sending password reset email to:', email);
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -244,6 +304,7 @@ export const AuthProvider = ({ children }) => {
       return false;
     } finally {
       setLoading(false);
+      loadingSetToFalse.current = false;
     }
   };
 
@@ -252,6 +313,8 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       setLoading(true);
+      loadingSetToFalse.current = false;
+      
       console.log('Updating password');
       
       const { error } = await supabase.auth.updateUser({
@@ -270,6 +333,7 @@ export const AuthProvider = ({ children }) => {
       return false;
     } finally {
       setLoading(false);
+      loadingSetToFalse.current = false;
     }
   };
 
@@ -281,7 +345,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('User not authenticated');
       }
       
-      console.log('Updating profile for user:', user.id.substring(0, 8) + '...');
+      console.log('Updating profile for user:', user.id);
       
       const { data, error } = await supabase
         .from('profiles')
@@ -310,7 +374,8 @@ export const AuthProvider = ({ children }) => {
     profileExists: !!profile,
     loading,
     hasError: !!authError,
-    authInitialized
+    authInitialized,
+    loadingSetToFalse: loadingSetToFalse.current
   });
 
   const value = {
