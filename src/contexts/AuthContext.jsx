@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import supabase from '../lib/supabase';
+import supabase, { refreshSession } from '../lib/supabase';
 
+// Create auth context with default values
 const AuthContext = createContext({
   user: null,
   profile: null,
@@ -28,202 +29,175 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
   
-  // Use a ref to track if we've already set loading to false
-  // This prevents race conditions when multiple auth events fire
-  const loadingSetToFalse = useRef(false);
+  // Refs to track initialization and prevent race conditions
+  const isInitialized = useRef(false);
+  const loadingTimeoutId = useRef(null);
+  const sessionCheckAttempted = useRef(false);
   
-  // Safe way to set loading to false only once
-  const safeSetLoadingFalse = () => {
-    if (!loadingSetToFalse.current) {
-      console.log('[AuthContext] Setting loading to FALSE');
-      setLoading(false);
-      loadingSetToFalse.current = true;
-    }
-  };
-
   // Clear any auth errors
   const clearAuthError = () => {
     console.log('[AuthContext] Clearing auth error');
     setAuthError(null);
   };
 
-  // Load user profile from the profiles table
-  const loadUserProfile = async (userId) => {
-    try {
-      console.log('[AuthContext] Loading profile for user:', userId);
-      
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      if (error) {
-        console.error('[AuthContext] Error loading profile:', error);
-        return null;
+  // CRITICAL: Force exit from loading state after a maximum timeout
+  // This prevents the app from being stuck in a loading state forever
+  useEffect(() => {
+    // Set a hard timeout to exit loading state after 5 seconds
+    loadingTimeoutId.current = setTimeout(() => {
+      if (loading) {
+        console.warn('[AuthContext] FORCE EXIT from loading state after timeout');
+        setLoading(false);
       }
-      
-      if (profile) {
-        console.log('[AuthContext] Profile loaded successfully:', profile);
-        setProfile(profile);
-        return profile;
-      } else {
-        console.log('[AuthContext] No profile found, creating one...');
-        
-        // Create profile if it doesn't exist
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: userId,
-              email: user.email,
-              display_name: user.user_metadata?.display_name || null,
-              created_at: new Date().toISOString()
-            }
-          ])
-          .select()
-          .single();
-          
-        if (createError) {
-          console.error('[AuthContext] Error creating profile:', createError);
-          return null;
-        }
-        
-        console.log('[AuthContext] New profile created:', newProfile);
-        setProfile(newProfile);
-        return newProfile;
+    }, 5000);
+    
+    return () => {
+      if (loadingTimeoutId.current) {
+        clearTimeout(loadingTimeoutId.current);
       }
-    } catch (error) {
-      console.error('[AuthContext] Error in loadUserProfile:', error);
-      return null;
-    }
-  };
+    };
+  }, [loading]);
 
   // Initialize auth state
   useEffect(() => {
+    console.log('[AuthContext] Initializing auth state...');
     let mounted = true;
-    console.log('[AuthContext] Initializing AuthProvider...');
     
-    // Force loading state to false after 8 seconds no matter what
-    // This is a safety mechanism to prevent permanent loading state
-    const hardTimeoutId = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('[AuthContext] HARD TIMEOUT: Forcing auth loading state to false after 8s');
-        safeSetLoadingFalse();
-        if (!authInitialized) {
-          setAuthInitialized(true);
-        }
-      }
-    }, 8000);
-
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[AuthContext] Auth state change event:', event, 'Session exists:', !!session);
-        
-        if (mounted) {
-          if (session?.user) {
-            console.log('[AuthContext] User found in session:', session.user.id);
-            setUser(session.user);
-            
-            // Load profile in the background but don't wait for it
-            loadUserProfile(session.user.id).catch(err => {
-              console.error('[AuthContext] Profile load failed but continuing:', err);
-            });
-          } else {
-            console.log('[AuthContext] No user in session');
-            setUser(null);
-            setProfile(null);
-          }
-          
-          // Any auth event means we're initialized
-          if (!authInitialized) {
-            setAuthInitialized(true);
-          }
-          
-          // IMPORTANT: Set loading to false after receiving any auth event
-          // This ensures we don't get stuck in loading state
-          safeSetLoadingFalse();
-        }
-      }
-    );
-
-    // Get the initial session directly - this is crucial as a backup
-    // in case the onAuthStateChange event doesn't fire properly
-    const getInitialSession = async () => {
+    // CRITICAL: Directly check the session first
+    const checkInitialSession = async () => {
+      if (sessionCheckAttempted.current) return;
+      sessionCheckAttempted.current = true;
+      
       try {
-        console.log('[AuthContext] Getting initial session directly...');
-        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('[AuthContext] Performing initial session check...');
+        const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('[AuthContext] Direct session retrieval error:', error);
+          console.error('[AuthContext] Initial session check error:', error.message);
           if (mounted) {
-            setAuthError('Failed to check authentication status');
-            safeSetLoadingFalse();
-            setAuthInitialized(true);
+            setAuthError('Authentication session error. Please try logging out and back in.');
+            setUser(null);
+            setLoading(false);
           }
           return;
         }
         
-        if (mounted) {
-          if (session?.user) {
-            console.log('[AuthContext] Initial direct session found for user:', session.user.id);
-            setUser(session.user);
-            
-            // Load profile but don't wait for it
-            loadUserProfile(session.user.id).catch(err => {
-              console.error('[AuthContext] Initial profile load failed but continuing:', err);
-            });
-          } else {
-            console.log('[AuthContext] No initial direct session found');
+        if (data.session) {
+          console.log('[AuthContext] Initial session found for user:', data.session.user.id);
+          if (mounted) {
+            setUser(data.session.user);
+          }
+        } else {
+          console.log('[AuthContext] No initial session found');
+          if (mounted) {
             setUser(null);
           }
-          
-          // Always initialize and stop loading after direct session check
-          setAuthInitialized(true);
-          safeSetLoadingFalse();
+        }
+        
+        if (mounted) {
+          setLoading(false);
         }
       } catch (error) {
-        console.error('[AuthContext] Error in direct session check:', error);
+        console.error('[AuthContext] Unexpected error during initial session check:', error.message);
         if (mounted) {
-          setAuthError('Authentication check failed');
-          safeSetLoadingFalse();
-          setAuthInitialized(true);
+          setAuthError('Authentication check failed. Please try again.');
+          setUser(null);
+          setLoading(false);
         }
       }
     };
-
-    // Execute the initial session check
-    getInitialSession();
-
-    // Add a shorter safety timeout to ensure loading state doesn't get stuck
-    const safetyTimeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('[AuthContext] Safety timeout triggered after 5s - forcing loading to false');
-        safeSetLoadingFalse();
-        if (!authInitialized) {
-          setAuthInitialized(true);
+    
+    // Start the initial session check immediately
+    checkInitialSession();
+    
+    // Set up the auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[AuthContext] Auth state change event:', event, 'Session exists:', !!session);
+        
+        if (!mounted) return;
+        
+        if (session) {
+          console.log('[AuthContext] User authenticated:', session.user.id);
+          setUser(session.user);
+          // We'll load profile separately to avoid blocking auth state update
+        } else {
+          console.log('[AuthContext] User signed out or no session');
+          setUser(null);
+          setProfile(null);
         }
+        
+        // CRITICAL: Always exit loading state after auth state change
+        setLoading(false);
       }
-    }, 5000);
-
+    );
+    
+    // Clean up on unmount
     return () => {
       mounted = false;
       subscription?.unsubscribe();
-      clearTimeout(safetyTimeout);
-      clearTimeout(hardTimeoutId);
+      if (loadingTimeoutId.current) {
+        clearTimeout(loadingTimeoutId.current);
+      }
     };
   }, []);
+  
+  // Load user profile when user changes
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadProfile = async () => {
+      try {
+        console.log('[AuthContext] Loading profile for user:', user.id);
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error('[AuthContext] Error loading profile:', error.message);
+          return;
+        }
+        
+        if (data) {
+          console.log('[AuthContext] Profile loaded successfully');
+          setProfile(data);
+        } else {
+          console.log('[AuthContext] Profile not found, creating one...');
+          
+          // Create profile if it doesn't exist
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([{
+              id: user.id,
+              email: user.email,
+              created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('[AuthContext] Error creating profile:', createError.message);
+          } else if (newProfile) {
+            console.log('[AuthContext] Profile created successfully');
+            setProfile(newProfile);
+          }
+        }
+      } catch (error) {
+        console.error('[AuthContext] Unexpected error loading profile:', error.message);
+      }
+    };
+    
+    loadProfile();
+  }, [user]);
 
   // Sign up with email and password
   const signUp = async (email, password, metadata = {}) => {
     try {
       clearAuthError();
-      setLoading(true);
-      loadingSetToFalse.current = false;
-      
       console.log('[AuthContext] Signing up user with email:', email);
       
       const { data, error } = await supabase.auth.signUp({
@@ -236,20 +210,17 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (error) {
-        console.error('[AuthContext] Signup error:', error);
+        console.error('[AuthContext] Signup error:', error.message);
         setAuthError(error.message);
         return null;
       }
       
-      console.log('[AuthContext] Signup successful');
+      console.log('[AuthContext] Signup successful:', data.user ? 'User created' : 'Confirmation email sent');
       return data;
     } catch (error) {
-      console.error('[AuthContext] Signup error caught:', error);
-      setAuthError(error.message);
+      console.error('[AuthContext] Unexpected signup error:', error.message);
+      setAuthError(error.message || 'An unexpected error occurred during signup');
       return null;
-    } finally {
-      setLoading(false);
-      loadingSetToFalse.current = false;
     }
   };
 
@@ -257,9 +228,6 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (email, password) => {
     try {
       clearAuthError();
-      setLoading(true);
-      loadingSetToFalse.current = false;
-      
       console.log('[AuthContext] Signing in user with email:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -268,25 +236,23 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (error) {
-        console.error('[AuthContext] Sign in error:', error);
+        console.error('[AuthContext] Sign in error:', error.message);
         setAuthError(error.message);
         return null;
       }
       
-      console.log('[AuthContext] Sign in successful, user:', data?.user?.id);
+      console.log('[AuthContext] Sign in successful, user ID:', data.user.id);
       
-      // Explicitly verify the session was created
+      // Verify the session was created
       const sessionCheck = await supabase.auth.getSession();
-      console.log('[AuthContext] Post-login session check:', !!sessionCheck.data.session);
+      console.log('[AuthContext] Post-login session check:', 
+                  sessionCheck.data.session ? 'Session exists' : 'No session');
       
       return data;
     } catch (error) {
-      console.error('[AuthContext] Sign in error caught:', error);
-      setAuthError(error.message);
+      console.error('[AuthContext] Unexpected sign in error:', error.message);
+      setAuthError(error.message || 'An unexpected error occurred during sign in');
       return null;
-    } finally {
-      setLoading(false);
-      loadingSetToFalse.current = false;
     }
   };
 
@@ -294,25 +260,20 @@ export const AuthProvider = ({ children }) => {
   const signOut = async () => {
     try {
       clearAuthError();
-      setLoading(true);
-      loadingSetToFalse.current = false;
-      
       console.log('[AuthContext] Signing out user');
       
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('[AuthContext] Sign out error:', error);
+        console.error('[AuthContext] Sign out error:', error.message);
         setAuthError(error.message);
       } else {
         console.log('[AuthContext] Sign out successful');
+        // Auth state change listener will update user state
       }
     } catch (error) {
-      console.error('[AuthContext] Sign out error caught:', error);
-      setAuthError(error.message);
-    } finally {
-      setLoading(false);
-      loadingSetToFalse.current = false;
+      console.error('[AuthContext] Unexpected sign out error:', error.message);
+      setAuthError(error.message || 'An unexpected error occurred during sign out');
     }
   };
 
@@ -320,9 +281,6 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = async (email) => {
     try {
       clearAuthError();
-      setLoading(true);
-      loadingSetToFalse.current = false;
-      
       console.log('[AuthContext] Sending password reset email to:', email);
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -330,7 +288,7 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (error) {
-        console.error('[AuthContext] Password reset error:', error);
+        console.error('[AuthContext] Password reset error:', error.message);
         setAuthError(error.message);
         return false;
       }
@@ -338,12 +296,9 @@ export const AuthProvider = ({ children }) => {
       console.log('[AuthContext] Password reset email sent successfully');
       return true;
     } catch (error) {
-      console.error('[AuthContext] Password reset error caught:', error);
-      setAuthError(error.message);
+      console.error('[AuthContext] Unexpected password reset error:', error.message);
+      setAuthError(error.message || 'An unexpected error occurred during password reset');
       return false;
-    } finally {
-      setLoading(false);
-      loadingSetToFalse.current = false;
     }
   };
 
@@ -351,9 +306,6 @@ export const AuthProvider = ({ children }) => {
   const updatePassword = async (password) => {
     try {
       clearAuthError();
-      setLoading(true);
-      loadingSetToFalse.current = false;
-      
       console.log('[AuthContext] Updating password');
       
       const { error } = await supabase.auth.updateUser({
@@ -361,7 +313,7 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (error) {
-        console.error('[AuthContext] Password update error:', error);
+        console.error('[AuthContext] Password update error:', error.message);
         setAuthError(error.message);
         return false;
       }
@@ -369,12 +321,9 @@ export const AuthProvider = ({ children }) => {
       console.log('[AuthContext] Password updated successfully');
       return true;
     } catch (error) {
-      console.error('[AuthContext] Password update error caught:', error);
-      setAuthError(error.message);
+      console.error('[AuthContext] Unexpected password update error:', error.message);
+      setAuthError(error.message || 'An unexpected error occurred during password update');
       return false;
-    } finally {
-      setLoading(false);
-      loadingSetToFalse.current = false;
     }
   };
 
@@ -383,7 +332,7 @@ export const AuthProvider = ({ children }) => {
     try {
       if (!user) {
         console.error('[AuthContext] Cannot update profile: No authenticated user');
-        throw new Error('User not authenticated');
+        throw new Error('You must be logged in to update your profile');
       }
       
       console.log('[AuthContext] Updating profile for user:', user.id);
@@ -396,7 +345,7 @@ export const AuthProvider = ({ children }) => {
         .single();
         
       if (error) {
-        console.error('[AuthContext] Profile update error:', error);
+        console.error('[AuthContext] Profile update error:', error.message);
         throw error;
       }
       
@@ -404,19 +353,17 @@ export const AuthProvider = ({ children }) => {
       setProfile(data);
       return data;
     } catch (error) {
-      console.error('[AuthContext] Error updating profile:', error);
+      console.error('[AuthContext] Profile update error:', error.message);
       return null;
     }
   };
 
   // Log the current auth state for debugging
-  console.log('[AuthContext] Auth context state:', { 
-    userExists: !!user, 
-    profileExists: !!profile, 
+  console.log('[AuthContext] Current state:', { 
+    user: user ? `${user.id.substring(0, 8)}...` : 'null', 
     loading, 
     hasError: !!authError,
-    authInitialized,
-    loadingSetToFalse: loadingSetToFalse.current
+    profile: profile ? 'loaded' : 'null'
   });
 
   const value = {

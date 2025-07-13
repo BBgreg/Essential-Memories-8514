@@ -16,7 +16,20 @@ const LoadingScreen = ({
   const [loadingTime, setLoadingTime] = useState(0);
   const [refreshAttempted, setRefreshAttempted] = useState(false);
 
-  // Show retry button after 3 seconds if still loading
+  // Log component mount for debugging
+  useEffect(() => {
+    console.log('[LoadingScreen] Mounted with:', { 
+      hasError: !!error, 
+      message, 
+      showRetry 
+    });
+    
+    return () => {
+      console.log('[LoadingScreen] Unmounted');
+    };
+  }, [error, message, showRetry]);
+
+  // Show retry button after delay if still loading
   useEffect(() => {
     if (!error) {
       const timer = setTimeout(() => setShowRetryButton(true), 3000);
@@ -30,12 +43,13 @@ const LoadingScreen = ({
       setLoadingTime(prev => {
         const newTime = prev + 1;
         
-        // At 5 seconds, try auto-refreshing the session if we haven't already
-        if (newTime === 5 && !refreshAttempted && !error) {
-          console.log('[LoadingScreen] Auto-attempting session refresh after 5s');
+        // At 4 seconds, try auto-refreshing the session if we haven't already
+        if (newTime === 4 && !refreshAttempted && !error) {
+          console.log('[LoadingScreen] Auto-attempting session refresh after delay');
           setRefreshAttempted(true);
+          
           refreshSession().then(success => {
-            console.log('[LoadingScreen] Auto session refresh result:', success);
+            console.log('[LoadingScreen] Auto session refresh result:', success ? 'Success' : 'Failed');
           });
         }
         
@@ -46,15 +60,15 @@ const LoadingScreen = ({
     return () => clearInterval(interval);
   }, [error, refreshAttempted]);
 
-  // Provide detailed error message when loading takes too long
+  // Provide detailed error message for long loading times
   const getDetailedHelp = () => {
-    if (loadingTime > 10) {
+    if (loadingTime > 8) {
       return (
         <div className="mt-4 text-xs text-text-secondary bg-gray-50 p-3 rounded-lg">
           <p className="font-medium mb-1">Troubleshooting tips:</p>
           <ul className="list-disc pl-4 space-y-1">
             <li>Check your internet connection</li>
-            <li>Try clearing browser cache and cookies</li>
+            <li>Try clearing your browser cache</li>
             <li>Try using a different browser</li>
             <li>If problem persists, try signing out and back in</li>
           </ul>
@@ -64,14 +78,16 @@ const LoadingScreen = ({
     return null;
   };
 
+  // Handle retry button click
   const handleRetry = () => {
-    console.log('[LoadingScreen] Retry loading requested by user after', loadingTime, 'seconds');
+    console.log('[LoadingScreen] Retry requested after', loadingTime, 'seconds');
     
+    // Call the provided retry function
     if (onRetry) onRetry();
     
-    // Force page reload as a last resort if loading takes too long
-    if (loadingTime > 15) {
-      console.log('[LoadingScreen] Forcing page reload after extended loading time');
+    // For very long loading times, force page reload
+    if (loadingTime > 12) {
+      console.log('[LoadingScreen] Long loading time detected, forcing page reload');
       window.location.reload();
     }
   };
@@ -91,17 +107,15 @@ const LoadingScreen = ({
           <p className="text-text-secondary">
             {error || "There was a problem loading your data. Please check your connection and try again."}
           </p>
-          {(showRetry || showRetryButton) && onRetry && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleRetry}
-              className="bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-3 px-6 rounded-xl font-semibold shadow-lg mt-4 mx-auto flex items-center"
-            >
-              <SafeIcon icon={FiRefreshCw} className="w-5 h-5 mr-2" />
-              Try Again
-            </motion.button>
-          )}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleRetry}
+            className="bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-3 px-6 rounded-xl font-semibold shadow-lg mt-4 mx-auto flex items-center"
+          >
+            <SafeIcon icon={FiRefreshCw} className="w-5 h-5 mr-2" />
+            Try Again
+          </motion.button>
         </motion.div>
       ) : (
         <motion.div
@@ -121,7 +135,7 @@ const LoadingScreen = ({
             <span className="text-xs text-gray-400">({loadingTime}s)</span>
           </p>
           {getDetailedHelp()}
-          {(showRetryButton || loadingTime > 8) && onRetry && (
+          {(showRetryButton || showRetry) && onRetry && (
             <motion.button
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

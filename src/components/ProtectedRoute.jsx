@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingScreen from './LoadingScreen';
-import supabase from '../lib/supabase';
 import { refreshSession } from '../lib/supabase';
 
 const ProtectedRoute = ({ children }) => {
@@ -10,32 +9,30 @@ const ProtectedRoute = ({ children }) => {
 
   // Add debug logging
   useEffect(() => {
-    console.log('[ProtectedRoute] State:', {
+    console.log('[ProtectedRoute] Current state:', {
       isAuthenticated: !!user,
       isLoading: loading,
-      userId: user?.id ? (user.id.substring(0, 8) + '...') : 'none'
+      userId: user?.id ? (user.id.substring(0, 8) + '...') : 'none',
+      pathname: window.location.pathname,
+      hash: window.location.hash
     });
     
-    // If we have a user but somehow auth is still loading, attempt to force refresh
-    if (user && loading) {
-      console.log('[ProtectedRoute] User exists but loading is still true, attempting refresh...');
-      refreshSession().then(success => {
-        console.log('[ProtectedRoute] Session refresh attempt result:', success);
-      });
+    // If we're stuck in a loading state, try refreshing the session
+    if (loading) {
+      const timeoutId = setTimeout(() => {
+        console.log('[ProtectedRoute] Still loading after delay, attempting session refresh');
+        refreshSession().then(success => {
+          console.log('[ProtectedRoute] Session refresh result:', success ? 'Success' : 'Failed');
+        });
+      }, 3000);
+      
+      return () => clearTimeout(timeoutId);
     }
-    
-    // Debug check for current session
-    const checkCurrentSession = async () => {
-      const session = await supabase.auth.getSession();
-      console.log('[ProtectedRoute] Current session check:', !!session.data.session);
-    };
-    
-    checkCurrentSession();
   }, [user, loading]);
 
   // If we're still loading, show the loading screen
   if (loading) {
-    console.log('[ProtectedRoute] Still loading auth state, showing loading screen');
+    console.log('[ProtectedRoute] Loading state active, showing loading screen');
     return <LoadingScreen message="Verifying your authentication..." />;
   }
 

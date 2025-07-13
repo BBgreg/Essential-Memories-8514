@@ -6,28 +6,20 @@ import Navbar from './Navbar';
 import ConfettiBackground from './ConfettiBackground';
 import LoadingScreen from './LoadingScreen';
 import { useLocation, useNavigate } from 'react-router-dom';
-import supabase, { refreshSession } from '../lib/supabase';
+import { refreshSession } from '../lib/supabase';
 
 const Layout = ({ children }) => {
   const { loading: authLoading, user, authError } = useAuth();
-  const {
-    loading: memoryLoading,
-    error: memoryError,
-    dataFetchAttempted,
-    retryLoadMemories
-  } = useMemory();
+  const { loading: memoryLoading, error: memoryError } = useMemory();
   const location = useLocation();
   const navigate = useNavigate();
 
   // Track how long we've been in the loading state
   const [loadingDuration, setLoadingDuration] = useState(0);
-
-  // Force exit from loading state after 10 seconds max
+  
+  // Force exit from loading state after maximum time
   const [forceExit, setForceExit] = useState(false);
   
-  // Track if we've attempted a session refresh
-  const [refreshAttempted, setRefreshAttempted] = useState(false);
-
   // Don't show loading screen on auth pages
   const isAuthPage = [
     '/login',
@@ -49,48 +41,35 @@ const Layout = ({ children }) => {
       '/privacy'
     ].includes(location.pathname);
 
-    if ((!authLoading || forceExit) && !user && isProtectedRoute) {
-      console.log('[Layout] No authenticated user found, redirecting to login page');
+    if (!authLoading && !user && isProtectedRoute) {
+      console.log('[Layout] Not loading and no user found for protected route, redirecting to login');
       navigate('/login');
     }
-  }, [authLoading, user, location.pathname, navigate, forceExit]);
+  }, [authLoading, user, location.pathname, navigate]);
 
   // Debug logging
   useEffect(() => {
     console.log('[Layout] Render state:', {
+      path: location.pathname,
       isAuthPage,
       authLoading,
       memoryLoading,
       hasUser: !!user,
-      memoryError,
-      dataFetchAttempted,
-      currentPath: location.pathname,
+      authError: authError ? 'Error present' : 'None',
+      memoryError: memoryError ? 'Error present' : 'None',
       forceExit,
-      loadingDuration,
-      refreshAttempted
+      loadingDuration
     });
-    
-    // Log current user information
-    const currentUser = supabase.auth.currentUser;
-    if (currentUser) {
-      console.log('[Layout] Current authenticated user:', {
-        id: currentUser.id,
-        email: currentUser.email
-      });
-    } else {
-      console.log('[Layout] No current authenticated user found in Layout component');
-    }
   }, [
+    location.pathname,
     isAuthPage,
     authLoading,
     memoryLoading,
     user,
+    authError,
     memoryError,
-    dataFetchAttempted,
-    location.pathname,
     forceExit,
-    loadingDuration,
-    refreshAttempted
+    loadingDuration
   ]);
 
   // Track loading duration and force exit if needed
@@ -101,18 +80,17 @@ const Layout = ({ children }) => {
         setLoadingDuration(prev => {
           const newDuration = prev + 1;
           
-          // Try to refresh the session at 5 seconds if we're still loading and haven't tried yet
-          if (newDuration === 5 && !refreshAttempted) {
+          // Try to refresh the session at 3 seconds if we're still loading
+          if (newDuration === 3) {
             console.log('[Layout] Loading taking too long, attempting session refresh...');
-            setRefreshAttempted(true);
-            refreshSession().then(success => {
-              console.log('[Layout] Session refresh attempt result:', success);
+            refreshSession().catch(err => {
+              console.error('[Layout] Session refresh failed:', err.message);
             });
           }
           
-          // Force exit from loading state after 10 seconds
-          if (newDuration >= 10 && !forceExit) {
-            console.warn('[Layout] CRITICAL: Forcing exit from loading state after 10s');
+          // Force exit from loading state after 6 seconds
+          if (newDuration >= 6 && !forceExit) {
+            console.warn('[Layout] Forcing exit from loading state after timeout');
             setForceExit(true);
           }
           
@@ -125,40 +103,43 @@ const Layout = ({ children }) => {
       // Reset loading duration when we're not loading
       setLoadingDuration(0);
     }
-  }, [authLoading, memoryLoading, user, isAuthPage, forceExit, refreshAttempted]);
+  }, [authLoading, memoryLoading, user, isAuthPage, forceExit]);
 
   // Retry function for auth errors
   const handleRetry = () => {
-    console.log('[Layout] Retrying after error or timeout...');
+    console.log('[Layout] Retry requested, refreshing session and page');
     
     // First try to refresh the session
-    refreshSession().then(success => {
-      console.log('[Layout] Session refresh attempt result:', success);
-      
-      // If success, try to reload memories
-      if (success && memoryError && retryLoadMemories) {
-        retryLoadMemories();
-      } else {
-        // Force reload as fallback
+    refreshSession()
+      .then(success => {
+        console.log('[Layout] Session refresh attempt result:', success);
+        
+        if (!success) {
+          // If session refresh fails, force reload the page
+          window.location.reload();
+        }
+      })
+      .catch(() => {
+        // On any error, force reload
         window.location.reload();
-      }
-    });
+      });
   };
 
   // Show loading screen only when necessary
   const showLoading = !isAuthPage && !forceExit && (authLoading || (memoryLoading && user));
-
-  // Show error only on protected pages when data fetch was attempted
-  const showError = !isAuthPage && (memoryError || authError) && (dataFetchAttempted || forceExit);
-
-  // Loading message based on what's actually happening
+  
+  // Show error only on protected pages
+  const showError = !isAuthPage && (authError || memoryError);
+  
+  // Error message to display
+  const errorMessage = authError || memoryError || "There was a problem loading the app.";
+  
+  // Dynamic loading message based on state
   const loadingMessage = authLoading
     ? "Checking authentication..."
     : memoryLoading
     ? "Loading your memories..."
     : "Initializing app...";
-
-  const errorMessage = memoryError || authError || "There was a problem loading the app.";
 
   return (
     <div className="app-container min-h-screen relative">
