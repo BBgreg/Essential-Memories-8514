@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import supabase, { refreshSession } from '../lib/supabase';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import supabase from '../lib/supabase';
 
 // Create auth context with default values
 const AuthContext = createContext({
@@ -30,162 +30,204 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
-  // Refs to track initialization and prevent race conditions
-  const isInitialized = useRef(false);
-  const loadingTimeoutId = useRef(null);
-  const sessionCheckAttempted = useRef(false);
-
   // Clear any auth errors
   const clearAuthError = () => {
     console.log('[AuthContext] Clearing auth error');
     setAuthError(null);
   };
 
-  // CRITICAL: Force exit from loading state after a maximum timeout
-  // This prevents the app from being stuck in a loading state forever
-  useEffect(() => {
-    // Set a hard timeout to exit loading state after 5 seconds
-    loadingTimeoutId.current = setTimeout(() => {
-      if (loading) {
-        console.warn('[AuthContext] FORCE EXIT from loading state after timeout');
-        setLoading(false);
-      }
-    }, 5000);
-
-    return () => {
-      if (loadingTimeoutId.current) {
-        clearTimeout(loadingTimeoutId.current);
-      }
-    };
-  }, [loading]);
-
-  // Initialize auth state
+  // Initialize auth state with robust error handling
   useEffect(() => {
     console.log('[AuthContext] Initializing auth state...');
+    
+    let authListener = null;
+    let timeoutId = null;
     let mounted = true;
 
-    // CRITICAL: Directly check the session first - SIMPLIFIED VERSION
-    const checkInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
+        if (!supabase) {
+          throw new Error("Supabase client not initialized due to config error.");
+        }
+
+        // Set up the auth state change listener
+        const { data: listenerData } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            console.log('[AuthContext] Auth state change event:', event, 'Session exists:', !!session);
+            
+            if (!mounted) return;
+
+            if (session) {
+              console.log('[AuthContext] User authenticated:', session.user.id);
+              setUser(session.user);
+              // Load profile after user is set
+              await loadUserProfile(session.user.id);
+            } else {
+              console.log('[AuthContext] User signed out or no session');
+              setUser(null);
+              setProfile(null);
+            }
+            
+            // Always exit loading state after auth state change
+            setLoading(false);
+          }
+        );
+        authListener = listenerData;
+
+        // CRITICAL: Initial session check with timeout
         console.log('[AuthContext] Performing initial session check...');
         
-        // SIMPLIFIED: Just get the session without complex error handling
-        const { data } = await supabase.auth.getSession();
-        
-        if (data.session) {
-          console.log('[AuthContext] Initial session found for user:', data.session.user.id);
-          if (mounted) {
-            setUser(data.session.user);
-          }
-        } else {
-          console.log('[AuthContext] No initial session found');
-          if (mounted) {
+        const getSessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error("Authentication check timed out after 10 seconds"));
+          }, 10000);
+        });
+
+        const { data: { session }, error: getSessionError } = await Promise.race([
+          getSessionPromise,
+          timeoutPromise
+        ]);
+
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+
+        console.log('[AuthContext] Initial session check result:', {
+          hasSession: !!session,
+          userId: session?.user?.id,
+          error: getSessionError?.message
+        });
+
+        if (getSessionError) {
+          console.error('[AuthContext] Session check error:', getSessionError);
+          throw getSessionError;
+        }
+
+        if (mounted) {
+          if (session) {
+            setUser(session.user);
+            await loadUserProfile(session.user.id);
+          } else {
             setUser(null);
+            setProfile(null);
           }
         }
+
       } catch (error) {
-        console.error('[AuthContext] Error during initial session check:', error.message);
+        console.error('[AuthContext] Error during auth initialization:', error);
         if (mounted) {
           setUser(null);
+          setProfile(null);
+          setAuthError(error.message);
         }
       } finally {
-        // CRITICAL: Always resolve loading state regardless of result
         if (mounted) {
           setLoading(false);
-          console.log('[AuthContext] Initial auth check complete. Loading state resolved.');
+          console.log('[AuthContext] Auth initialization complete');
         }
       }
     };
 
-    // Start the initial session check immediately
-    checkInitialSession();
+    initializeAuth();
 
-    // Set up the auth state change listener - SIMPLIFIED VERSION
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[AuthContext] Auth state change event:', event, 'Session exists:', !!session);
-        
-        if (!mounted) return;
-        
-        if (session) {
-          console.log('[AuthContext] User authenticated:', session.user.id);
-          setUser(session.user);
-        } else {
-          console.log('[AuthContext] User signed out or no session');
-          setUser(null);
-          setProfile(null);
-        }
-        
-        // CRITICAL: Always exit loading state after auth state change
-        setLoading(false);
-      }
-    );
-
-    // Clean up on unmount
     return () => {
       mounted = false;
-      subscription?.unsubscribe();
-      if (loadingTimeoutId.current) {
-        clearTimeout(loadingTimeoutId.current);
+      if (authListener?.subscription) {
+        authListener.subscription.unsubscribe();
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
     };
   }, []);
 
-  // Load user profile when user changes - SIMPLIFIED VERSION
-  useEffect(() => {
-    if (!user) return;
-    
-    const loadProfile = async () => {
-      try {
-        console.log('[AuthContext] Loading profile for user:', user.id);
-        
-        // Simple profile fetch without complex error handling
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        
-        if (data) {
-          console.log('[AuthContext] Profile loaded successfully');
-          setProfile(data);
+  // Load user profile
+  const loadUserProfile = async (userId) => {
+    try {
+      console.log('[AuthContext] Loading profile for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, create it
+          console.log('[AuthContext] Profile not found, creating...');
+          await createUserProfile(userId);
         } else {
-          console.log('[AuthContext] No profile found');
-          setProfile(null);
+          console.error('[AuthContext] Error loading profile:', error);
+          throw error;
         }
-      } catch (error) {
-        console.error('[AuthContext] Error loading profile:', error.message);
-        setProfile(null);
+      } else {
+        console.log('[AuthContext] Profile loaded successfully');
+        setProfile(data);
       }
-    };
-    
-    loadProfile();
-  }, [user]);
+    } catch (error) {
+      console.error('[AuthContext] Error in loadUserProfile:', error);
+      setProfile(null);
+    }
+  };
+
+  // Create user profile
+  const createUserProfile = async (userId) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('No user data available');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            email: userData.user.email,
+            display_name: userData.user.user_metadata?.display_name || null,
+            created_at: new Date().toISOString()
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[AuthContext] Error creating profile:', error);
+        throw error;
+      }
+
+      console.log('[AuthContext] Profile created successfully');
+      setProfile(data);
+      return data;
+    } catch (error) {
+      console.error('[AuthContext] Error in createUserProfile:', error);
+      throw error;
+    }
+  };
 
   // Sign up with email and password
   const signUp = async (email, password, metadata = {}) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Signing up user with email:', email);
-      
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: metadata,
-          // SIMPLIFIED: No email redirect for now
+          data: metadata
         }
       });
-      
+
       if (error) {
         console.error('[AuthContext] Signup error:', error.message);
         setAuthError(error.message);
         return null;
       }
-      
+
       console.log('[AuthContext] Signup successful:', data.user ? 'User created' : 'Confirmation email sent');
       return data;
-      
     } catch (error) {
       console.error('[AuthContext] Unexpected signup error:', error.message);
       setAuthError(error.message || 'An unexpected error occurred during signup');
@@ -198,21 +240,20 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Signing in user with email:', email);
-      
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
-      
+
       if (error) {
         console.error('[AuthContext] Sign in error:', error.message);
         setAuthError(error.message);
         return null;
       }
-      
+
       console.log('[AuthContext] Sign in successful, user ID:', data.user.id);
       return data;
-      
     } catch (error) {
       console.error('[AuthContext] Unexpected sign in error:', error.message);
       setAuthError(error.message || 'An unexpected error occurred during sign in');
@@ -225,41 +266,38 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Signing out user');
-      
+
       const { error } = await supabase.auth.signOut();
-      
       if (error) {
         console.error('[AuthContext] Sign out error:', error.message);
         setAuthError(error.message);
       } else {
         console.log('[AuthContext] Sign out successful');
       }
-      
     } catch (error) {
       console.error('[AuthContext] Unexpected sign out error:', error.message);
       setAuthError(error.message || 'An unexpected error occurred during sign out');
     }
   };
 
-  // Reset password (forgot password)
+  // Reset password
   const resetPassword = async (email) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Sending password reset email to:', email);
-      
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/#/update-password`
       });
-      
+
       if (error) {
         console.error('[AuthContext] Password reset error:', error.message);
         setAuthError(error.message);
         return false;
       }
-      
+
       console.log('[AuthContext] Password reset email sent successfully');
       return true;
-      
     } catch (error) {
       console.error('[AuthContext] Unexpected password reset error:', error.message);
       setAuthError(error.message || 'An unexpected error occurred during password reset');
@@ -272,20 +310,16 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Updating password');
-      
-      const { error } = await supabase.auth.updateUser({
-        password
-      });
-      
+
+      const { error } = await supabase.auth.updateUser({ password });
       if (error) {
         console.error('[AuthContext] Password update error:', error.message);
         setAuthError(error.message);
         return false;
       }
-      
+
       console.log('[AuthContext] Password updated successfully');
       return true;
-      
     } catch (error) {
       console.error('[AuthContext] Unexpected password update error:', error.message);
       setAuthError(error.message || 'An unexpected error occurred during password update');
@@ -293,39 +327,39 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Update profile - SIMPLIFIED VERSION
+  // Update profile
   const updateProfile = async (updates) => {
     try {
       if (!user) {
         console.error('[AuthContext] Cannot update profile: No authenticated user');
         throw new Error('You must be logged in to update your profile');
       }
-      
+
       console.log('[AuthContext] Updating profile for user:', user.id);
-      
+
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
         .eq('id', user.id)
         .select()
         .single();
-      
+
       if (error) {
         console.error('[AuthContext] Profile update error:', error.message);
         throw error;
       }
-      
+
       console.log('[AuthContext] Profile updated successfully');
       setProfile(data);
       return data;
-      
     } catch (error) {
       console.error('[AuthContext] Profile update error:', error.message);
+      setAuthError(error.message);
       return null;
     }
   };
 
-  // Log the current auth state for debugging
+  // Log current auth state for debugging
   console.log('[AuthContext] Current state:', {
     user: user ? `${user.id.substring(0, 8)}...` : 'null',
     loading,

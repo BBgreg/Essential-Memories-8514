@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { MemoryProvider } from './contexts/MemoryContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 
-// Direct page imports - no AuthProvider or Context dependencies
+// Import pages
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Home from './pages/Home';
@@ -18,71 +23,117 @@ import Privacy from './pages/Privacy';
 // Styles
 import './App.css';
 
-function App() {
-  console.log('🚀 DEBUG: App.jsx - Initial render START');
-  console.log('🔍 DEBUG: Current URL:', window.location.href);
-  console.log('🔧 DEBUG: Running in environment:', process.env.NODE_ENV);
-  
-  // Log environment variables presence (without exposing values)
-  console.log('📋 DEBUG: Environment Variables Check:', {
-    VITE_APP_SUPABASE_URL: !!import.meta.env.VITE_APP_SUPABASE_URL ? '✅ FOUND' : '❌ MISSING',
-    VITE_APP_SUPABASE_ANON_KEY: !!import.meta.env.VITE_APP_SUPABASE_ANON_KEY ? '✅ FOUND' : '❌ MISSING'
+function AppContent() {
+  const { user, loading } = useAuth();
+
+  // Handle redirection for authenticated users who land on auth pages
+  useEffect(() => {
+    if (!loading && user) {
+      const currentHash = window.location.hash;
+      if (currentHash === '#/login' || currentHash === '#/signup' || currentHash === '#/') {
+        console.log('[App] Authenticated user on auth page, redirecting to /home');
+        window.location.hash = '/home';
+      }
+    }
+  }, [user, loading]);
+
+  console.log('[App] Current state:', {
+    isAuthenticated: !!user,
+    isLoading: loading,
+    currentPath: window.location.hash
   });
 
   return (
-    <Router>
-      {(() => {
-        console.log('🎯 DEBUG: Router rendering, preparing routes...');
-        return (
+    <ErrorBoundary>
+      <MemoryProvider>
+        <Layout>
           <Routes>
-            {/* Force root to login - IMMEDIATE AND UNCONDITIONAL */}
+            {/* Root redirect */}
             <Route 
               path="/" 
               element={
                 (() => {
-                  console.log('⚡ DEBUG: Root path "/" accessed - FORCING redirect to /login');
+                  console.log('[App] Root path accessed, redirecting to login');
                   return <Navigate to="/login" replace />;
                 })()
               } 
             />
 
-            {/* Public Routes - NO AUTH CHECKS */}
-            <Route 
-              path="/login" 
-              element={
-                (() => {
-                  console.log('🔑 DEBUG: Rendering Login page');
-                  return <Login />;
-                })()
-              } 
-            />
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/update-password" element={<UpdatePassword />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
 
-            {/* App Routes - TEMPORARILY ACCESSIBLE WITHOUT AUTH */}
-            <Route path="/home" element={<Home />} />
-            <Route path="/add" element={<AddMemory />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/flashcards" element={<Flashcards />} />
-            <Route path="/statistics" element={<Statistics />} />
-            <Route path="/profile" element={<Profile />} />
-
-            {/* Catch all unknown routes - redirect to login */}
+            {/* Protected routes */}
             <Route 
-              path="*" 
+              path="/home" 
               element={
-                (() => {
-                  console.log('⚠️ DEBUG: Unknown route accessed - redirecting to /login');
-                  return <Navigate to="/login" replace />;
-                })()
+                <ProtectedRoute>
+                  <Home />
+                </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/add" 
+              element={
+                <ProtectedRoute>
+                  <AddMemory />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/calendar" 
+              element={
+                <ProtectedRoute>
+                  <Calendar />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/flashcards" 
+              element={
+                <ProtectedRoute>
+                  <Flashcards />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/statistics" 
+              element={
+                <ProtectedRoute>
+                  <Statistics />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
-        );
-      })()}
+        </Layout>
+      </MemoryProvider>
+    </ErrorBoundary>
+  );
+}
+
+function App() {
+  console.log('[App] Application starting...');
+  
+  return (
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </Router>
   );
 }

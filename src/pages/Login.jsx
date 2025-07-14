@@ -1,56 +1,98 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
-import supabase from '../lib/supabase';
 
 const { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle } = FiIcons;
 
 const Login = () => {
-  console.log('🔐 DEBUG: Login component - Initial render');
-  
+  const navigate = useNavigate();
+  const { signIn, authError, clearAuthError, user, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Direct Supabase login without AuthContext
-  const handleLogin = async (e) => {
+  console.log('[Login] Component state:', {
+    isAuthenticated: !!user,
+    isLoading: loading,
+    hasAuthError: !!authError,
+    hasFormError: !!formError
+  });
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!loading && user) {
+      console.log('[Login] User already authenticated, redirecting to home');
+      navigate('/home', { replace: true });
+    }
+  }, [user, loading, navigate]);
+
+  // Clear errors when component unmounts
+  useEffect(() => {
+    return () => {
+      clearAuthError();
+    };
+  }, [clearAuthError]);
+
+  const validateForm = () => {
+    setFormError('');
+    
+    if (!email.trim()) {
+      setFormError('Email is required');
+      return false;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setFormError('Please enter a valid email address');
+      return false;
+    }
+    
+    if (!password) {
+      setFormError('Password is required');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('🔄 DEBUG: Login attempt starting for email:', email);
+    
+    if (!validateForm()) return;
     
     setIsSubmitting(true);
-    setError('');
-
+    console.log('[Login] Attempting login for email:', email);
+    
     try {
-      console.log('📡 DEBUG: Calling Supabase signInWithPassword...');
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) {
-        console.error('❌ DEBUG: Login error:', error.message);
-        setError(error.message);
-        return;
-      }
-
-      if (data?.user) {
-        console.log('✅ DEBUG: Login successful for user:', data.user.id);
-        window.location.hash = '/home';
+      const result = await signIn(email, password);
+      if (result) {
+        console.log('[Login] Login successful, redirecting to home');
+        navigate('/home', { replace: true });
       }
     } catch (error) {
-      console.error('💥 DEBUG: Unexpected login error:', error);
-      setError('An unexpected error occurred. Please try again.');
+      console.error('[Login] Login error:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  console.log('🎨 DEBUG: Login component - Rendering form');
-  
+  // Show loading if auth is still initializing
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-vibrant-pink border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-lg font-medium text-text-primary">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md">
@@ -65,18 +107,18 @@ const Login = () => {
             <p className="text-text-secondary">Welcome back! Log in to your account</p>
           </div>
 
-          {error && (
+          {(authError || formError) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="bg-red-50 text-red-600 rounded-xl p-4 mb-6 flex items-center"
             >
               <SafeIcon icon={FiAlertCircle} className="w-5 h-5 mr-2 flex-shrink-0" />
-              <p className="text-sm">{error}</p>
+              <p className="text-sm">{formError || authError}</p>
             </motion.div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <label className="text-text-primary font-semibold block">Email</label>
               <div className="relative">

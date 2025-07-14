@@ -21,7 +21,7 @@ const Signup = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
 
-  console.log('Signup component rendering, current state:', {
+  console.log('[Signup] Component state:', {
     email,
     signupSuccess,
     isSubmitting,
@@ -32,12 +32,12 @@ const Signup = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      console.log('User already logged in, redirecting to home');
-      navigate('/');
+      console.log('[Signup] User already logged in, redirecting to home');
+      navigate('/home');
     }
   }, [user, navigate]);
 
-  // Clear any auth errors when the component unmounts
+  // Clear auth errors on unmount
   useEffect(() => {
     return () => {
       clearAuthError();
@@ -46,66 +46,63 @@ const Signup = () => {
 
   const validateForm = () => {
     setFormError('');
-    
+
     if (!email.trim()) {
       setFormError('Email is required');
       return false;
     }
-    
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setFormError('Please enter a valid email address');
       return false;
     }
-    
+
     if (!password) {
       setFormError('Password is required');
       return false;
     }
-    
+
     if (password.length < 6) {
       setFormError('Password must be at least 6 characters');
       return false;
     }
-    
+
     if (password !== confirmPassword) {
       setFormError('Passwords do not match');
       return false;
     }
-    
+
     if (!termsAccepted) {
       setFormError('You must accept the Terms of Service and Privacy Policy');
       return false;
     }
-    
+
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Signup form submitted');
-    
+    console.log('[Signup] Form submitted');
+
     if (!validateForm()) {
-      console.log('Form validation failed:', formError);
+      console.log('[Signup] Form validation failed:', formError);
       return;
     }
 
     setIsSubmitting(true);
-    console.log('Attempting to sign up user with email:', email);
+    console.log('[Signup] Attempting signup for email:', email);
 
     try {
-      const result = await signUp(email, password);
-      console.log('Signup result:', result);
-      
+      const result = await signUp(email, password, { display_name: displayName });
+      console.log('[Signup] Signup result:', result);
+
       if (result) {
-        console.log('Signup successful, showing success message');
+        console.log('[Signup] Signup successful, showing success message');
         setSignupSuccess(true);
-        // Don't redirect - wait for email confirmation
-      } else {
-        console.log('Signup failed, no result returned');
       }
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('[Signup] Signup error:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -113,7 +110,7 @@ const Signup = () => {
 
   // Success state - email verification message
   if (signupSuccess) {
-    console.log('Rendering signup success state');
+    console.log('[Signup] Rendering success state');
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <motion.div
@@ -171,7 +168,7 @@ const Signup = () => {
   }
 
   // Main signup form
-  console.log('Rendering main signup form');
+  console.log('[Signup] Rendering signup form');
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md">

@@ -1,51 +1,68 @@
 import { createClient } from '@supabase/supabase-js';
 
-console.log('🔧 DEBUG: Initializing Supabase client...');
+console.log('[Supabase] Initializing client...');
 
-// Hardcoded credentials as fallback
-const FALLBACK_URL = 'https://shtdwlskoalumikaqbtg.supabase.co';
-const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodGR3bHNrb2FsdW1pa2FxYnRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODk3MDgsImV4cCI6MjA2NzM2NTcwOH0.i4egQfsYmumV5sclre4GCV33aGPFIFmdtEYHvarxzoY';
+// Environment variables with fallbacks
+const SUPABASE_URL = import.meta.env.VITE_APP_SUPABASE_URL || 'https://shtdwlskoalumikaqbtg.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodGR3bHNrb2FsdW1pa2FxYnRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODk3MDgsImV4cCI6MjA2NzM2NTcwOH0.i4egQfsYmumV5sclre4GCV33aGPFIFmdtEYHvarxzoY';
 
-// Try to get environment variables first
-const SUPABASE_URL = import.meta.env.VITE_APP_SUPABASE_URL || FALLBACK_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_APP_SUPABASE_ANON_KEY || FALLBACK_KEY;
-
-// Log configuration (without exposing full key)
-console.log('📋 DEBUG: Supabase Configuration:', {
+// Log configuration
+console.log('[Supabase] Configuration:', {
   URL: SUPABASE_URL,
   KEY_PREFIX: SUPABASE_ANON_KEY.substring(0, 10) + '...',
-  USING_FALLBACK_URL: SUPABASE_URL === FALLBACK_URL ? '⚠️ YES' : '✅ NO',
-  USING_FALLBACK_KEY: SUPABASE_ANON_KEY === FALLBACK_KEY ? '⚠️ YES' : '✅ NO'
+  USING_ENV_URL: !!import.meta.env.VITE_APP_SUPABASE_URL,
+  USING_ENV_KEY: !!import.meta.env.VITE_APP_SUPABASE_ANON_KEY
 });
 
-// Create Supabase client with minimal configuration
+// Validate configuration
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const error = 'Missing Supabase configuration. Please check environment variables.';
+  console.error('[Supabase] ERROR:', error);
+  throw new Error(error);
+}
+
+// Create Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true, // Enable for email confirmation
     autoRefreshToken: true,
-    storageKey: 'essential-memories-auth-v2'
+    storageKey: 'essential-memories-auth'
   }
 });
-
-// Verify client creation
-if (supabase) {
-  console.log('✅ DEBUG: Supabase client created successfully');
-} else {
-  console.error('❌ DEBUG: Failed to create Supabase client');
-}
 
 // Test connection
 supabase.auth.getSession()
   .then(({ data, error }) => {
     if (error) {
-      console.error('❌ DEBUG: Initial session check failed:', error.message);
+      console.error('[Supabase] Initial session check failed:', error.message);
     } else {
-      console.log('🔍 DEBUG: Initial session check:', data.session ? '✅ Session found' : '⚠️ No session');
+      console.log('[Supabase] Initial session check:', data.session ? 'Session found' : 'No session');
     }
   })
   .catch(err => {
-    console.error('💥 DEBUG: Unexpected error during session check:', err.message);
+    console.error('[Supabase] Unexpected error during session check:', err.message);
   });
+
+// Enhanced session refresh function
+export const refreshSession = async () => {
+  try {
+    console.log('[Supabase] Refreshing session...');
+    const { data, error } = await supabase.auth.refreshSession();
+    
+    if (error) {
+      console.error('[Supabase] Session refresh failed:', error.message);
+      return false;
+    }
+    
+    console.log('[Supabase] Session refreshed successfully');
+    return true;
+  } catch (error) {
+    console.error('[Supabase] Session refresh error:', error.message);
+    return false;
+  }
+};
+
+console.log('[Supabase] Client initialized successfully');
 
 export default supabase;
