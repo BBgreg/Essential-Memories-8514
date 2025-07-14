@@ -31,7 +31,7 @@ const Login = () => {
   useEffect(() => {
     if (user) {
       console.log('[Login] User already logged in, redirecting to home');
-      navigate('/home'); // CRITICAL CHANGE: Redirect to /home instead of /
+      navigate('/home'); // Redirect to /home if already logged in
     }
   }, [user, navigate]);
 
@@ -89,7 +89,7 @@ const Login = () => {
         console.log('[Login] Redirecting to home page...');
         
         // Force immediate redirect to home
-        navigate('/home', { replace: true }); // CRITICAL CHANGE: Redirect to /home
+        navigate('/home', { replace: true });
       } else {
         console.error('[Login] Login failed - no user returned');
         setFormError('Login failed. Please check your credentials and try again.');

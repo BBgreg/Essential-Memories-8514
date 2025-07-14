@@ -95,7 +95,7 @@ function App() {
   // Set up global error handling
   useEffect(() => {
     console.log('[App] Initializing with URL:', window.location.href);
-    console.log('[App] App Version:', '1.0.7'); // Increment version for tracking
+    console.log('[App] App Version:', '1.0.8'); // Increment version for tracking
     console.log('[App] Environment:', process.env.NODE_ENV);
     
     // Log any environment variables (without exposing sensitive data)
@@ -161,12 +161,12 @@ function AppContent() {
   return (
     <Layout>
       <Routes>
-        {/* CRITICAL CHANGE: Always redirect root "/" to "/login" if not authenticated, or to "/home" if authenticated */}
+        {/* CRITICAL CHANGE: Always redirect root "/" to "/login" regardless of authentication status */}
         <Route 
           path="/" 
           element={(() => {
-            console.log("DEBUG: Root path '/' accessed. Redirecting to:", user ? '/home' : '/login');
-            return <Navigate to={user ? '/home' : '/login'} replace />;
+            console.log("DEBUG: Root path '/' accessed. Always redirecting to login page");
+            return <Navigate to="/login" replace />;
           })()} 
         />
 
@@ -187,12 +187,12 @@ function AppContent() {
         <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
-        {/* Fallback for any unknown paths - redirects to login or home based on auth */}
+        {/* Fallback for any unknown paths - always redirect to login */}
         <Route 
           path="*" 
           element={(() => {
-            console.log("DEBUG: Unknown path accessed. Redirecting to:", user ? '/home' : '/login');
-            return <Navigate to={user ? '/home' : '/login'} replace />;
+            console.log("DEBUG: Unknown path accessed. Always redirecting to login page");
+            return <Navigate to="/login" replace />;
           })()} 
         />
       </Routes>

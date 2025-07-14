@@ -27,7 +27,8 @@ const Layout = ({ children }) => {
     '/forgot-password',
     '/update-password',
     '/terms',
-    '/privacy'
+    '/privacy',
+    '/' // Added root path as an auth page
   ].includes(location.pathname);
 
   // Force login redirect if auth check completes and no user is found (for protected routes)
@@ -38,7 +39,8 @@ const Layout = ({ children }) => {
       '/forgot-password',
       '/update-password',
       '/terms',
-      '/privacy'
+      '/privacy',
+      '/' // Added root path to non-protected routes
     ].includes(location.pathname);
 
     if (!authLoading && !user && isProtectedRoute) {
