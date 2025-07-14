@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
-  
+
   // Refs to track initialization and prevent race conditions
   const isInitialized = useRef(false);
   const loadingTimeoutId = useRef(null);
@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }) => {
     checkInitialSession();
 
     // Set up the auth state change listener
-    const { data: { subscription }} = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[AuthContext] Auth state change event:', event, 'Session exists:', !!session);
         
@@ -197,7 +197,7 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Signing up user with email:', email);
-      
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -227,7 +227,7 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Signing in user with email:', email);
-      
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -244,7 +244,7 @@ export const AuthProvider = ({ children }) => {
       // Verify the session was created
       const sessionCheck = await supabase.auth.getSession();
       console.log('[AuthContext] Post-login session check:', 
-                  sessionCheck.data.session ? 'Session exists' : 'No session');
+        sessionCheck.data.session ? 'Session exists' : 'No session');
 
       return data;
     } catch (error) {
@@ -259,7 +259,7 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Signing out user');
-      
+
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -280,7 +280,7 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Sending password reset email to:', email);
-      
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/#/update-password`
       });
@@ -305,7 +305,7 @@ export const AuthProvider = ({ children }) => {
     try {
       clearAuthError();
       console.log('[AuthContext] Updating password');
-      
+
       const { error } = await supabase.auth.updateUser({
         password
       });
@@ -334,7 +334,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       console.log('[AuthContext] Updating profile for user:', user.id);
-      
+
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)

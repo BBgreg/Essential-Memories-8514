@@ -3,11 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 
 // Function to safely get environment variables with fallbacks
 const getEnvVar = (name) => {
-  const value = process.env[`NEXT_PUBLIC_${name}`] ||
-                process.env[`REACT_APP_${name}`] ||
-                process.env[`VITE_APP_${name}`] ||
+  const value = process.env[`NEXT_PUBLIC_${name}`] || 
+                process.env[`REACT_APP_${name}`] || 
+                process.env[`VITE_APP_${name}`] || 
                 process.env[name];
-  
+
   // Hardcoded fallbacks for known project values if env vars are missing
   if (!value) {
     if (name === 'SUPABASE_URL') {
@@ -36,9 +36,9 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 // Create a single Supabase client instance with explicit options
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    persistSession: true,      // Persist session in localStorage
-    autoRefreshToken: true,    // Automatically refresh tokens
-    detectSessionInUrl: true,  // Look for tokens in URL after OAuth login
+    persistSession: true, // Persist session in localStorage
+    autoRefreshToken: true, // Automatically refresh tokens
+    detectSessionInUrl: true, // Look for tokens in URL after OAuth login
     storageKey: 'essential-memories-auth-v2', // Custom key to avoid conflicts
   }
 });
@@ -52,7 +52,7 @@ supabase.auth.getSession()
       // Don't throw here - allow the app to continue and show login screen
     } else {
       console.log('[Supabase] Initial session check SUCCESS - User:', 
-                  data.session?.user ? `ID: ${data.session.user.id.substring(0,8)}...` : 'None');
+        data.session?.user ? `ID: ${data.session.user.id.substring(0,8)}...` : 'None');
     }
   })
   .catch(err => {
@@ -79,12 +79,10 @@ export const refreshSession = async () => {
   try {
     console.log('[Supabase] Manually refreshing session...');
     const { data, error } = await supabase.auth.refreshSession();
-    
     if (error) {
       console.error('[Supabase] Session refresh FAILED:', error.message);
       return false;
     }
-    
     const hasValidSession = !!data.session;
     console.log('[Supabase] Session refresh result:', hasValidSession ? 'SUCCESS' : 'NO SESSION');
     return hasValidSession;
@@ -99,12 +97,10 @@ export const getSession = async () => {
   try {
     console.log('[Supabase] Fetching current session');
     const { data, error } = await supabase.auth.getSession();
-    
     if (error) {
       console.error('[Supabase] getSession FAILED:', error.message);
       return null;
     }
-    
     return data.session;
   } catch (error) {
     console.error('[Supabase] Unexpected error in getSession:', error.message);

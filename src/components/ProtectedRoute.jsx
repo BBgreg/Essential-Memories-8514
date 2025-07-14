@@ -12,11 +12,11 @@ const ProtectedRoute = ({ children }) => {
     console.log('[ProtectedRoute] Current state:', {
       isAuthenticated: !!user,
       isLoading: loading,
-      userId: user?.id ? (user.id.substring(0, 8) + '...') : 'none',
+      userId: user?.id ? (user.id.substring(0,8) + '...') : 'none',
       pathname: window.location.pathname,
       hash: window.location.hash
     });
-    
+
     // If we're stuck in a loading state for too long, try refreshing the session
     if (loading) {
       const timeoutId = setTimeout(() => {
@@ -25,7 +25,7 @@ const ProtectedRoute = ({ children }) => {
           console.log('[ProtectedRoute] Session refresh result:', success ? 'Success' : 'Failed');
         });
       }, 3000);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [user, loading]);

@@ -6,11 +6,11 @@ import { refreshSession } from '../lib/supabase';
 
 const { FiLoader, FiAlertCircle, FiRefreshCw } = FiIcons;
 
-const LoadingScreen = ({
-  message = 'Loading your memories...',
-  error = null,
+const LoadingScreen = ({ 
+  message = 'Loading your memories...', 
+  error = null, 
   onRetry = null,
-  showRetry = false
+  showRetry = false 
 }) => {
   const [showRetryButton, setShowRetryButton] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
@@ -18,13 +18,13 @@ const LoadingScreen = ({
 
   // Enhanced component lifecycle logging
   useEffect(() => {
-    console.log('[LoadingScreen] Mounted with:', { 
-      hasError: !!error, 
-      message, 
+    console.log('[LoadingScreen] Mounted with:', {
+      hasError: !!error,
+      message,
       showRetry,
       currentTime: new Date().toISOString()
     });
-    
+
     return () => {
       console.log('[LoadingScreen] Unmounted at:', new Date().toISOString());
     };
@@ -47,21 +47,20 @@ const LoadingScreen = ({
       setLoadingTime(prev => {
         const newTime = prev + 1;
         console.log('[LoadingScreen] Loading time:', newTime, 'seconds');
-        
+
         // At 4 seconds, try auto-refreshing the session if we haven't already
         if (newTime === 4 && !refreshAttempted && !error) {
           console.log('[LoadingScreen] Auto-attempting session refresh after 4s delay');
           setRefreshAttempted(true);
-          
           refreshSession().then(success => {
             console.log('[LoadingScreen] Auto session refresh result:', success ? 'Success' : 'Failed');
           });
         }
-        
+
         return newTime;
       });
     }, 1000);
-    
+
     return () => clearInterval(interval);
   }, [error, refreshAttempted]);
 
@@ -89,7 +88,7 @@ const LoadingScreen = ({
     
     // Call the provided retry function
     if (onRetry) onRetry();
-    
+
     // For very long loading times, force page reload
     if (loadingTime > 12) {
       console.log('[LoadingScreen] Long loading time detected, forcing page reload');

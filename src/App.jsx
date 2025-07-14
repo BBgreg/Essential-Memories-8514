@@ -37,7 +37,6 @@ const setupGlobalErrorHandling = () => {
       colno,
       error
     });
-
     // Call the original handler if it exists
     if (originalOnError) return originalOnError(message, source, lineno, colno, error);
     return false;
@@ -47,7 +46,6 @@ const setupGlobalErrorHandling = () => {
   const originalOnUnhandledRejection = window.onunhandledrejection;
   window.onunhandledrejection = (event) => {
     console.error('[App] Unhandled Promise Rejection:', event.reason);
-
     // Call the original handler if it exists
     if (originalOnUnhandledRejection) return originalOnUnhandledRejection(event);
   };
@@ -59,12 +57,36 @@ const setupGlobalErrorHandling = () => {
   };
 };
 
-// Simple global loading component
-const GlobalLoading = () => (
-  <div className="fixed inset-0 flex items-center justify-center bg-white/90 z-50">
-    <div className="text-center">
-      <div className="w-16 h-16 border-4 border-vibrant-pink border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-      <p className="text-lg font-medium text-text-primary">Loading application...</p>
+// Simple global loading component with animation and message
+const GlobalLoading = ({ message = "Loading application..." }) => (
+  <div className="fixed inset-0 flex items-center justify-center bg-white/90 backdrop-blur-sm z-50">
+    <div className="text-center space-y-4">
+      <div className="w-16 h-16 border-4 border-vibrant-pink border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <p className="text-lg font-medium text-text-primary">{message}</p>
+      <p className="text-sm text-text-secondary">Please wait...</p>
+    </div>
+  </div>
+);
+
+// Simple error display component
+const ErrorDisplay = ({ error, onRetry }) => (
+  <div className="fixed inset-0 flex items-center justify-center bg-white/90 backdrop-blur-sm z-50">
+    <div className="bg-white rounded-lg p-8 max-w-md w-full shadow-xl text-center space-y-4">
+      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+        <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+      <h2 className="text-xl font-bold text-gray-900">Application Error</h2>
+      <p className="text-gray-600">{error.message || "An unexpected error occurred."}</p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white px-6 py-3 rounded-xl font-semibold shadow-lg"
+        >
+          Try Again
+        </button>
+      )}
     </div>
   </div>
 );
@@ -73,7 +95,7 @@ function App() {
   // Set up global error handling
   useEffect(() => {
     console.log('[App] Initializing with URL:', window.location.href);
-    console.log('[App] App Version:', '1.0.5'); // Increment version for tracking
+    console.log('[App] App Version:', '1.0.6'); // Increment version for tracking
     
     // Setup global error handling
     return setupGlobalErrorHandling();
@@ -107,23 +129,23 @@ function AppContent() {
     });
   }, [user, loading]);
 
-  // If auth is still loading, show a simple loading indicator
-  // We use this instead of the Layout's loading screen for the initial app load
+  // CRITICAL: Handle initial loading state
   if (loading) {
     console.log('[AppContent] Auth still loading, showing global loading indicator');
-    return <GlobalLoading />;
+    return <GlobalLoading message="Checking authentication..." />;
   }
 
   return (
     <Layout>
       <Routes>
         {/* CRITICAL CHANGE: Always redirect root "/" to "/login" */}
-        <Route path="/" element={
-          (() => {
+        <Route 
+          path="/" 
+          element={(() => {
             console.log("DEBUG: Root path '/' accessed. Redirecting to /login.");
             return <Navigate to="/login" replace />;
-          })()
-        } />
+          })()} 
+        />
 
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
@@ -143,12 +165,13 @@ function AppContent() {
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
         {/* Fallback for any unknown paths - redirects to login */}
-        <Route path="*" element={
-          (() => {
+        <Route 
+          path="*" 
+          element={(() => {
             console.log("DEBUG: Unknown path accessed. Redirecting to /login.");
             return <Navigate to="/login" replace />;
-          })()
-        } />
+          })()} 
+        />
       </Routes>
     </Layout>
   );
