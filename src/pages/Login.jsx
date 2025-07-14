@@ -31,7 +31,7 @@ const Login = () => {
   useEffect(() => {
     if (user) {
       console.log('[Login] User already logged in, redirecting to home');
-      navigate('/');
+      navigate('/home'); // CRITICAL CHANGE: Redirect to /home instead of /
     }
   }, [user, navigate]);
 
@@ -86,9 +86,8 @@ const Login = () => {
       if (result && result.user) {
         console.log('[Login] Login successful for user:', result.user.id);
         console.log('[Login] Redirecting to home page...');
-        
         // Force immediate redirect to home
-        navigate('/', { replace: true });
+        navigate('/home', { replace: true }); // CRITICAL CHANGE: Redirect to /home
       } else {
         console.error('[Login] Login failed - no user returned');
         setFormError('Login failed. Please check your credentials and try again.');
@@ -108,6 +107,7 @@ const Login = () => {
   }
 
   console.log('[Login] Rendering login form');
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md">

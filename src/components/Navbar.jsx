@@ -19,7 +19,7 @@ const Navbar = () => {
   }
 
   const navItems = [
-    { path: '/', icon: FiHome, label: 'Home' },
+    { path: '/home', icon: FiHome, label: 'Home' }, // CRITICAL CHANGE: Changed from '/' to '/home'
     { path: '/add', icon: FiPlus, label: 'Add' },
     { path: '/calendar', icon: FiCalendar, label: 'Calendar' },
     { path: '/flashcards', icon: FiLayers, label: 'Practice' },
@@ -36,7 +36,6 @@ const Navbar = () => {
       <div className="grid grid-cols-6 h-16">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
-          
           return (
             <Link
               key={item.path}

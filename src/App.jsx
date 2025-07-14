@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MemoryProvider } from './contexts/MemoryContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -73,7 +73,7 @@ function App() {
   // Set up global error handling
   useEffect(() => {
     console.log('[App] Initializing with URL:', window.location.href);
-    console.log('[App] App Version:', '1.0.4'); // Increment version for tracking
+    console.log('[App] App Version:', '1.0.5'); // Increment version for tracking
     
     // Setup global error handling
     return setupGlobalErrorHandling();
@@ -117,6 +117,14 @@ function AppContent() {
   return (
     <Layout>
       <Routes>
+        {/* CRITICAL CHANGE: Always redirect root "/" to "/login" */}
+        <Route path="/" element={
+          (() => {
+            console.log("DEBUG: Root path '/' accessed. Redirecting to /login.");
+            return <Navigate to="/login" replace />;
+          })()
+        } />
+
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
@@ -125,16 +133,22 @@ function AppContent() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
 
-        {/* Protected Routes */}
-        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        {/* Protected Routes - These are the actual application pages */}
+        {/* Users will only reach these AFTER logging in from /login */}
+        <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/add" element={<ProtectedRoute><AddMemory /></ProtectedRoute>} />
         <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
         <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
         <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
-        {/* Catch-all route - redirect to home or login */}
-        <Route path="*" element={<Navigate to={user ? "/" : "/login"} replace />} />
+        {/* Fallback for any unknown paths - redirects to login */}
+        <Route path="*" element={
+          (() => {
+            console.log("DEBUG: Unknown path accessed. Redirecting to /login.");
+            return <Navigate to="/login" replace />;
+          })()
+        } />
       </Routes>
     </Layout>
   );
