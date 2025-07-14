@@ -42,14 +42,14 @@ const Layout = ({ children }) => {
     ].includes(location.pathname);
 
     if (!authLoading && !user && isProtectedRoute) {
-      console.log('[Layout] Not loading and no user found for protected route, redirecting to login');
+      console.log('[Layout] ⚠️ Not loading and no user found for protected route, redirecting to login');
       navigate('/login');
     }
   }, [authLoading, user, location.pathname, navigate]);
 
-  // Debug logging
+  // Enhanced debug logging
   useEffect(() => {
-    console.log('[Layout] Render state:', {
+    console.log('[Layout] Current state:', {
       path: location.pathname,
       isAuthPage,
       authLoading,
@@ -76,13 +76,15 @@ const Layout = ({ children }) => {
   useEffect(() => {
     // Only track loading time if we're actually in a loading state
     if ((authLoading || (memoryLoading && user)) && !isAuthPage) {
+      console.log('[Layout] Starting loading duration timer');
+      
       const interval = setInterval(() => {
         setLoadingDuration(prev => {
           const newDuration = prev + 1;
           
           // Try to refresh the session at 3 seconds if we're still loading
           if (newDuration === 3) {
-            console.log('[Layout] Loading taking too long, attempting session refresh...');
+            console.log('[Layout] Loading taking too long (3s), attempting session refresh...');
             refreshSession().catch(err => {
               console.error('[Layout] Session refresh failed:', err.message);
             });
@@ -90,7 +92,7 @@ const Layout = ({ children }) => {
           
           // Force exit from loading state after 6 seconds
           if (newDuration >= 6 && !forceExit) {
-            console.warn('[Layout] Forcing exit from loading state after timeout');
+            console.warn('[Layout] ⚠️ Forcing exit from loading state after timeout (6s)');
             setForceExit(true);
           }
           
@@ -101,26 +103,31 @@ const Layout = ({ children }) => {
       return () => clearInterval(interval);
     } else {
       // Reset loading duration when we're not loading
-      setLoadingDuration(0);
+      if (loadingDuration !== 0) {
+        console.log('[Layout] Resetting loading duration timer');
+        setLoadingDuration(0);
+      }
     }
-  }, [authLoading, memoryLoading, user, isAuthPage, forceExit]);
+  }, [authLoading, memoryLoading, user, isAuthPage, forceExit, loadingDuration]);
 
   // Retry function for auth errors
   const handleRetry = () => {
-    console.log('[Layout] Retry requested, refreshing session and page');
+    console.log('[Layout] 🔄 Retry requested, refreshing session and page');
     
     // First try to refresh the session
     refreshSession()
       .then(success => {
-        console.log('[Layout] Session refresh attempt result:', success);
+        console.log('[Layout] Session refresh attempt result:', success ? 'Success' : 'Failed');
         
         if (!success) {
           // If session refresh fails, force reload the page
+          console.log('[Layout] Session refresh failed, forcing page reload');
           window.location.reload();
         }
       })
       .catch(() => {
         // On any error, force reload
+        console.log('[Layout] Error during session refresh, forcing page reload');
         window.location.reload();
       });
   };

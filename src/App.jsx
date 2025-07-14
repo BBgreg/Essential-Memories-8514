@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { MemoryProvider } from './contexts/MemoryContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
 import Home from './pages/Home';
@@ -25,12 +26,18 @@ import './App.css';
 // Global error handling
 const setupGlobalErrorHandling = () => {
   console.log('[App] Setting up global error handling');
-  
+
   // Capture unhandled errors
   const originalOnError = window.onerror;
   window.onerror = (message, source, lineno, colno, error) => {
-    console.error('[App] Global error caught:', { message, source, lineno, colno, error });
-    
+    console.error('[App] Global error caught:', {
+      message,
+      source,
+      lineno,
+      colno,
+      error
+    });
+
     // Call the original handler if it exists
     if (originalOnError) return originalOnError(message, source, lineno, colno, error);
     return false;
@@ -40,7 +47,7 @@ const setupGlobalErrorHandling = () => {
   const originalOnUnhandledRejection = window.onunhandledrejection;
   window.onunhandledrejection = (event) => {
     console.error('[App] Unhandled Promise Rejection:', event.reason);
-    
+
     // Call the original handler if it exists
     if (originalOnUnhandledRejection) return originalOnUnhandledRejection(event);
   };
@@ -66,7 +73,7 @@ function App() {
   // Set up global error handling
   useEffect(() => {
     console.log('[App] Initializing with URL:', window.location.href);
-    console.log('[App] App Version:', '1.0.3'); // Increment version for tracking
+    console.log('[App] App Version:', '1.0.4'); // Increment version for tracking
     
     // Setup global error handling
     return setupGlobalErrorHandling();
@@ -74,19 +81,39 @@ function App() {
 
   return (
     <React.StrictMode>
-      <AuthProvider>
-        <MemoryProvider>
-          <Router>
-            <AppContent />
-          </Router>
-        </MemoryProvider>
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <MemoryProvider>
+            <Router>
+              <AppContent />
+            </Router>
+          </MemoryProvider>
+        </AuthProvider>
+      </ErrorBoundary>
     </React.StrictMode>
   );
 }
 
 // Separate component to access auth context
 function AppContent() {
+  const { user, loading } = useAuth();
+
+  // Log important state changes
+  useEffect(() => {
+    console.log('[AppContent] Auth state changed:', {
+      isAuthenticated: !!user,
+      isLoading: loading,
+      currentPath: window.location.hash
+    });
+  }, [user, loading]);
+
+  // If auth is still loading, show a simple loading indicator
+  // We use this instead of the Layout's loading screen for the initial app load
+  if (loading) {
+    console.log('[AppContent] Auth still loading, showing global loading indicator');
+    return <GlobalLoading />;
+  }
+
   return (
     <Layout>
       <Routes>
@@ -107,7 +134,7 @@ function AppContent() {
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
         {/* Catch-all route - redirect to home or login */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={user ? "/" : "/login"} replace />} />
       </Routes>
     </Layout>
   );

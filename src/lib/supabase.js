@@ -1,16 +1,33 @@
+// CRITICAL: Core Supabase client configuration with robust error handling
 import { createClient } from '@supabase/supabase-js';
 
-// CRITICAL: Hard-coded Supabase URL and anon key to ensure they're always available
-// This is acceptable for client-side auth with RLS policies properly configured
-// NOTE: These values are public and meant to be exposed in the client-side code
-const SUPABASE_URL = 'https://shtdwlskoalumikaqbtg.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodGR3bHNrb2FsdW1pa2FxYnRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODk3MDgsImV4cCI6MjA2NzM2NTcwOH0.i4egQfsYmumV5sclre4GCV33aGPFIFmdtEYHvarxzoY';
+// Function to safely get environment variables with fallbacks
+const getEnvVar = (name) => {
+  const value = process.env[`NEXT_PUBLIC_${name}`] ||
+                process.env[`REACT_APP_${name}`] ||
+                process.env[`VITE_APP_${name}`] ||
+                process.env[name];
+  
+  // Hardcoded fallbacks for known project values if env vars are missing
+  if (!value) {
+    if (name === 'SUPABASE_URL') {
+      return 'https://shtdwlskoalumikaqbtg.supabase.co';
+    }
+    if (name === 'SUPABASE_ANON_KEY') {
+      return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodGR3bHNrb2FsdW1pa2FxYnRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3ODk3MDgsImV4cCI6MjA2NzM2NTcwOH0.i4egQfsYmumV5sclre4GCV33aGPFIFmdtEYHvarxzoY';
+    }
+  }
+  return value;
+};
 
-// Extensive debug logging to verify credentials are available
+const SUPABASE_URL = getEnvVar('SUPABASE_URL');
+const SUPABASE_ANON_KEY = getEnvVar('SUPABASE_ANON_KEY');
+
+// CRITICAL: Extensive debug logging
 console.log('[Supabase] Initialization - URL:', !!SUPABASE_URL ? 'AVAILABLE' : 'MISSING', 
             'Key:', !!SUPABASE_ANON_KEY ? 'AVAILABLE' : 'MISSING');
 
-// Verify credentials are valid before proceeding
+// CRITICAL: Verify credentials are valid before proceeding
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('[Supabase] CRITICAL ERROR: Missing Supabase configuration');
   throw new Error('Missing Supabase configuration. Please check your environment variables.');
@@ -22,7 +39,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,      // Persist session in localStorage
     autoRefreshToken: true,    // Automatically refresh tokens
     detectSessionInUrl: true,  // Look for tokens in URL after OAuth login
-    storageKey: 'essential-memories-auth-v2', // Custom key to avoid conflicts with previous versions
+    storageKey: 'essential-memories-auth-v2', // Custom key to avoid conflicts
   }
 });
 
@@ -35,7 +52,7 @@ supabase.auth.getSession()
       // Don't throw here - allow the app to continue and show login screen
     } else {
       console.log('[Supabase] Initial session check SUCCESS - User:', 
-                  data.session?.user ? `ID: ${data.session.user.id.substring(0, 8)}...` : 'None');
+                  data.session?.user ? `ID: ${data.session.user.id.substring(0,8)}...` : 'None');
     }
   })
   .catch(err => {
@@ -80,6 +97,7 @@ export const refreshSession = async () => {
 // Helper to get the current session with error handling
 export const getSession = async () => {
   try {
+    console.log('[Supabase] Fetching current session');
     const { data, error } = await supabase.auth.getSession();
     
     if (error) {

@@ -16,36 +16,41 @@ const LoadingScreen = ({
   const [loadingTime, setLoadingTime] = useState(0);
   const [refreshAttempted, setRefreshAttempted] = useState(false);
 
-  // Log component mount for debugging
+  // Enhanced component lifecycle logging
   useEffect(() => {
     console.log('[LoadingScreen] Mounted with:', { 
       hasError: !!error, 
       message, 
-      showRetry 
+      showRetry,
+      currentTime: new Date().toISOString()
     });
     
     return () => {
-      console.log('[LoadingScreen] Unmounted');
+      console.log('[LoadingScreen] Unmounted at:', new Date().toISOString());
     };
   }, [error, message, showRetry]);
 
   // Show retry button after delay if still loading
   useEffect(() => {
     if (!error) {
-      const timer = setTimeout(() => setShowRetryButton(true), 3000);
+      const timer = setTimeout(() => {
+        console.log('[LoadingScreen] Showing retry button after delay');
+        setShowRetryButton(true);
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [error]);
 
-  // Track loading time for diagnostics
+  // Track loading time and attempt auto-recovery
   useEffect(() => {
     const interval = setInterval(() => {
       setLoadingTime(prev => {
         const newTime = prev + 1;
+        console.log('[LoadingScreen] Loading time:', newTime, 'seconds');
         
         // At 4 seconds, try auto-refreshing the session if we haven't already
         if (newTime === 4 && !refreshAttempted && !error) {
-          console.log('[LoadingScreen] Auto-attempting session refresh after delay');
+          console.log('[LoadingScreen] Auto-attempting session refresh after 4s delay');
           setRefreshAttempted(true);
           
           refreshSession().then(success => {

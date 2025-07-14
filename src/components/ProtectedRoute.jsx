@@ -7,7 +7,7 @@ import { refreshSession } from '../lib/supabase';
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
-  // Add debug logging
+  // Enhanced debug logging
   useEffect(() => {
     console.log('[ProtectedRoute] Current state:', {
       isAuthenticated: !!user,
@@ -17,7 +17,7 @@ const ProtectedRoute = ({ children }) => {
       hash: window.location.hash
     });
     
-    // If we're stuck in a loading state, try refreshing the session
+    // If we're stuck in a loading state for too long, try refreshing the session
     if (loading) {
       const timeoutId = setTimeout(() => {
         console.log('[ProtectedRoute] Still loading after delay, attempting session refresh');
@@ -30,20 +30,20 @@ const ProtectedRoute = ({ children }) => {
     }
   }, [user, loading]);
 
-  // If we're still loading, show the loading screen
+  // If still in loading state, show a loading screen
   if (loading) {
-    console.log('[ProtectedRoute] Loading state active, showing loading screen');
+    console.log('[ProtectedRoute] 🔄 Auth still loading, showing loading screen');
     return <LoadingScreen message="Verifying your authentication..." />;
   }
 
-  // If not authenticated, redirect to login
+  // If authentication check is complete and no user is found, redirect to login
   if (!user) {
-    console.log('[ProtectedRoute] No authenticated user, redirecting to login');
+    console.log('[ProtectedRoute] ⚠️ No authenticated user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
-  // If authenticated, render the protected component
-  console.log('[ProtectedRoute] User authenticated, rendering protected content');
+  // User is authenticated, render the protected content
+  console.log('[ProtectedRoute] ✅ User authenticated, rendering protected content');
   return children;
 };
 
