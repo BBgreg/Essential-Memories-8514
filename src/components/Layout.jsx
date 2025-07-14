@@ -19,7 +19,7 @@ const Layout = ({ children }) => {
   
   // Force exit from loading state after maximum time
   const [forceExit, setForceExit] = useState(false);
-  
+
   // Don't show loading screen on auth pages
   const isAuthPage = [
     '/login',
@@ -89,7 +89,7 @@ const Layout = ({ children }) => {
               console.error('[Layout] Session refresh failed:', err.message);
             });
           }
-          
+
           // Force exit from loading state after 6 seconds
           if (newDuration >= 6 && !forceExit) {
             console.warn('[Layout] ⚠️ Forcing exit from loading state after timeout (6s)');
@@ -99,7 +99,7 @@ const Layout = ({ children }) => {
           return newDuration;
         });
       }, 1000);
-
+      
       return () => clearInterval(interval);
     } else {
       // Reset loading duration when we're not loading
@@ -142,11 +142,10 @@ const Layout = ({ children }) => {
   const errorMessage = authError || memoryError || "There was a problem loading the app.";
   
   // Dynamic loading message based on state
-  const loadingMessage = authLoading
-    ? "Checking authentication..."
-    : memoryLoading
-    ? "Loading your memories..."
-    : "Initializing app...";
+  const loadingMessage = 
+    authLoading ? "Checking authentication..." : 
+    memoryLoading ? "Loading your memories..." : 
+    "Initializing app...";
 
   return (
     <div className="app-container min-h-screen relative">
@@ -155,16 +154,16 @@ const Layout = ({ children }) => {
       {showLoading && (
         <LoadingScreen 
           message={loadingMessage} 
-          onRetry={handleRetry} 
-          showRetry={loadingDuration > 3} 
+          onRetry={handleRetry}
+          showRetry={loadingDuration > 3}
         />
       )}
       
       {showError && (
         <LoadingScreen 
           error={errorMessage} 
-          onRetry={handleRetry} 
-          showRetry={true} 
+          onRetry={handleRetry}
+          showRetry={true}
         />
       )}
       

@@ -95,7 +95,21 @@ function App() {
   // Set up global error handling
   useEffect(() => {
     console.log('[App] Initializing with URL:', window.location.href);
-    console.log('[App] App Version:', '1.0.6'); // Increment version for tracking
+    console.log('[App] App Version:', '1.0.7'); // Increment version for tracking
+    console.log('[App] Environment:', process.env.NODE_ENV);
+    
+    // Log any environment variables (without exposing sensitive data)
+    console.log('[App] Environment Variables Check:', {
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL ? 'FOUND' : 'MISSING',
+      REACT_APP_SUPABASE_URL: !!process.env.REACT_APP_SUPABASE_URL ? 'FOUND' : 'MISSING',
+      VITE_APP_SUPABASE_URL: !!process.env.VITE_APP_SUPABASE_URL ? 'FOUND' : 'MISSING',
+      SUPABASE_URL: !!process.env.SUPABASE_URL ? 'FOUND' : 'MISSING',
+      
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'FOUND' : 'MISSING',
+      REACT_APP_SUPABASE_ANON_KEY: !!process.env.REACT_APP_SUPABASE_ANON_KEY ? 'FOUND' : 'MISSING',
+      VITE_APP_SUPABASE_ANON_KEY: !!process.env.VITE_APP_SUPABASE_ANON_KEY ? 'FOUND' : 'MISSING',
+      SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY ? 'FOUND' : 'MISSING',
+    });
     
     // Setup global error handling
     return setupGlobalErrorHandling();
@@ -118,16 +132,25 @@ function App() {
 
 // Separate component to access auth context
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, authError } = useAuth();
 
   // Log important state changes
   useEffect(() => {
     console.log('[AppContent] Auth state changed:', {
       isAuthenticated: !!user,
       isLoading: loading,
+      hasError: !!authError,
       currentPath: window.location.hash
     });
-  }, [user, loading]);
+  }, [user, loading, authError]);
+
+  // Handle auth error
+  if (authError && !loading) {
+    return <ErrorDisplay 
+      error={{ message: `Authentication Error: ${authError}` }} 
+      onRetry={() => window.location.reload()} 
+    />;
+  }
 
   // CRITICAL: Handle initial loading state
   if (loading) {
@@ -138,12 +161,12 @@ function AppContent() {
   return (
     <Layout>
       <Routes>
-        {/* CRITICAL CHANGE: Always redirect root "/" to "/login" */}
+        {/* CRITICAL CHANGE: Always redirect root "/" to "/login" if not authenticated, or to "/home" if authenticated */}
         <Route 
           path="/" 
           element={(() => {
-            console.log("DEBUG: Root path '/' accessed. Redirecting to /login.");
-            return <Navigate to="/login" replace />;
+            console.log("DEBUG: Root path '/' accessed. Redirecting to:", user ? '/home' : '/login');
+            return <Navigate to={user ? '/home' : '/login'} replace />;
           })()} 
         />
 
@@ -164,12 +187,12 @@ function AppContent() {
         <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
-        {/* Fallback for any unknown paths - redirects to login */}
+        {/* Fallback for any unknown paths - redirects to login or home based on auth */}
         <Route 
           path="*" 
           element={(() => {
-            console.log("DEBUG: Unknown path accessed. Redirecting to /login.");
-            return <Navigate to="/login" replace />;
+            console.log("DEBUG: Unknown path accessed. Redirecting to:", user ? '/home' : '/login');
+            return <Navigate to={user ? '/home' : '/login'} replace />;
           })()} 
         />
       </Routes>

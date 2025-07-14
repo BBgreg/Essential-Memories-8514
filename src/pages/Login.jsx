@@ -44,48 +44,50 @@ const Login = () => {
 
   const validateForm = () => {
     setFormError('');
+    
     if (!email.trim()) {
       setFormError('Email is required');
       return false;
     }
-
+    
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setFormError('Please enter a valid email address');
       return false;
     }
-
+    
     if (!password) {
       setFormError('Password is required');
       return false;
     }
-
+    
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log('[Login] Form submitted');
-
+    
     if (!validateForm()) {
       console.log('[Login] Form validation failed:', formError);
       return;
     }
-
+    
     setIsSubmitting(true);
     setFormError('');
     clearAuthError();
     setLoginAttempted(true);
-
+    
     console.log('[Login] Attempting to sign in user with email:', email);
-
+    
     try {
       const result = await signIn(email, password);
       console.log('[Login] Sign in result:', result ? 'Success' : 'Failed');
-
+      
       if (result && result.user) {
         console.log('[Login] Login successful for user:', result.user.id);
         console.log('[Login] Redirecting to home page...');
+        
         // Force immediate redirect to home
         navigate('/home', { replace: true }); // CRITICAL CHANGE: Redirect to /home
       } else {
@@ -107,7 +109,7 @@ const Login = () => {
   }
 
   console.log('[Login] Rendering login form');
-
+  
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md">
