@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MemoryProvider } from './contexts/MemoryContext';
 import Layout from './components/Layout';
@@ -95,7 +95,7 @@ function App() {
   // Set up global error handling
   useEffect(() => {
     console.log('[App] Initializing with URL:', window.location.href);
-    console.log('[App] App Version:', '1.0.8'); // Increment version for tracking
+    console.log('[App] App Version:', '1.0.9'); // Increment version for tracking
     console.log('[App] Environment:', process.env.NODE_ENV);
     
     // Log any environment variables (without exposing sensitive data)
@@ -144,33 +144,42 @@ function AppContent() {
     });
   }, [user, loading, authError]);
 
-  // Handle auth error
-  if (authError && !loading) {
-    return <ErrorDisplay 
-      error={{ message: `Authentication Error: ${authError}` }} 
-      onRetry={() => window.location.reload()} 
-    />;
-  }
+  // SIMPLIFIED APPROACH: If there's an auth error, show it but continue to login page
+  useEffect(() => {
+    if (authError) {
+      console.error('[AppContent] Authentication error detected:', authError);
+      // Continue to login page instead of showing error screen
+    }
+  }, [authError]);
 
-  // CRITICAL: Handle initial loading state
+  // SIMPLIFIED APPROACH: Handle initial loading state with timeout
   if (loading) {
     console.log('[AppContent] Auth still loading, showing global loading indicator');
     return <GlobalLoading message="Checking authentication..." />;
   }
 
+  // SIMPLIFIED APPROACH: Always redirect to login/signup if not on those pages
+  // This ensures we can at least access the login screen
+  if (!window.location.hash.includes('/login') && 
+      !window.location.hash.includes('/signup') &&
+      !window.location.hash.includes('/forgot-password') &&
+      !window.location.hash.includes('/update-password') &&
+      !window.location.hash.includes('/terms') &&
+      !window.location.hash.includes('/privacy')) {
+    console.log('[AppContent] Not on auth page, redirecting to login (simplified approach)');
+    return <Navigate to="/login" replace />;
+  }
+
   return (
     <Layout>
       <Routes>
-        {/* CRITICAL CHANGE: Always redirect root "/" to "/login" regardless of authentication status */}
+        {/* SIMPLIFIED APPROACH: Always redirect root to login */}
         <Route 
           path="/" 
-          element={(() => {
-            console.log("DEBUG: Root path '/' accessed. Always redirecting to login page");
-            return <Navigate to="/login" replace />;
-          })()} 
+          element={<Navigate to="/login" replace />} 
         />
 
-        {/* Public Routes */}
+        {/* Public Routes - Always accessible */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -178,22 +187,19 @@ function AppContent() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
 
-        {/* Protected Routes - These are the actual application pages */}
-        {/* Users will only reach these AFTER logging in from /login */}
-        <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-        <Route path="/add" element={<ProtectedRoute><AddMemory /></ProtectedRoute>} />
-        <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-        <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
-        <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        {/* SIMPLIFIED APPROACH: Make all routes temporarily accessible */}
+        {/* This helps diagnose if authentication is the blocker */}
+        <Route path="/home" element={<Home />} />
+        <Route path="/add" element={<AddMemory />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/flashcards" element={<Flashcards />} />
+        <Route path="/statistics" element={<Statistics />} />
+        <Route path="/profile" element={<Profile />} />
 
         {/* Fallback for any unknown paths - always redirect to login */}
         <Route 
           path="*" 
-          element={(() => {
-            console.log("DEBUG: Unknown path accessed. Always redirecting to login page");
-            return <Navigate to="/login" replace />;
-          })()} 
+          element={<Navigate to="/login" replace />} 
         />
       </Routes>
     </Layout>

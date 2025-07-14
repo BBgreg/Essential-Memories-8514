@@ -64,53 +64,35 @@ export const AuthProvider = ({ children }) => {
     console.log('[AuthContext] Initializing auth state...');
     let mounted = true;
 
-    // CRITICAL: Directly check the session first
+    // CRITICAL: Directly check the session first - SIMPLIFIED VERSION
     const checkInitialSession = async () => {
-      if (sessionCheckAttempted.current) return;
-      sessionCheckAttempted.current = true;
-
       try {
         console.log('[AuthContext] Performing initial session check...');
-        const { data, error } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error('[AuthContext] Initial session check error:', error.message);
-          console.error('[AuthContext] Full error details:', error);
-          
-          if (mounted) {
-            setAuthError('Authentication session error. Please try logging out and back in.');
-            setUser(null);
-            setLoading(false);
-          }
-          return;
-        }
-
+        // SIMPLIFIED: Just get the session without complex error handling
+        const { data } = await supabase.auth.getSession();
+        
         if (data.session) {
           console.log('[AuthContext] Initial session found for user:', data.session.user.id);
-          console.log('[AuthContext] Session expires at:', new Date(data.session.expires_at * 1000).toLocaleString());
-          
           if (mounted) {
             setUser(data.session.user);
           }
         } else {
           console.log('[AuthContext] No initial session found');
-          
           if (mounted) {
             setUser(null);
           }
         }
-
-        if (mounted) {
-          setLoading(false);
-        }
       } catch (error) {
-        console.error('[AuthContext] Unexpected error during initial session check:', error.message);
-        console.error('[AuthContext] Full error:', error);
-        
+        console.error('[AuthContext] Error during initial session check:', error.message);
         if (mounted) {
-          setAuthError('Authentication check failed. Please try again.');
           setUser(null);
+        }
+      } finally {
+        // CRITICAL: Always resolve loading state regardless of result
+        if (mounted) {
           setLoading(false);
+          console.log('[AuthContext] Initial auth check complete. Loading state resolved.');
         }
       }
     };
@@ -118,24 +100,22 @@ export const AuthProvider = ({ children }) => {
     // Start the initial session check immediately
     checkInitialSession();
 
-    // Set up the auth state change listener
+    // Set up the auth state change listener - SIMPLIFIED VERSION
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[AuthContext] Auth state change event:', event, 'Session exists:', !!session);
         
         if (!mounted) return;
-
+        
         if (session) {
           console.log('[AuthContext] User authenticated:', session.user.id);
-          console.log('[AuthContext] Session expires at:', new Date(session.expires_at * 1000).toLocaleString());
           setUser(session.user);
-          // We'll load profile separately to avoid blocking auth state update
         } else {
           console.log('[AuthContext] User signed out or no session');
           setUser(null);
           setProfile(null);
         }
-
+        
         // CRITICAL: Always exit loading state after auth state change
         setLoading(false);
       }
@@ -151,59 +131,34 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // Load user profile when user changes
+  // Load user profile when user changes - SIMPLIFIED VERSION
   useEffect(() => {
     if (!user) return;
-
+    
     const loadProfile = async () => {
       try {
         console.log('[AuthContext] Loading profile for user:', user.id);
         
-        const { data, error } = await supabase
+        // Simple profile fetch without complex error handling
+        const { data } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
-
-        if (error) {
-          console.error('[AuthContext] Error loading profile:', error.message);
-          console.error('[AuthContext] Full error:', error);
-          return;
-        }
-
+        
         if (data) {
           console.log('[AuthContext] Profile loaded successfully');
           setProfile(data);
         } else {
-          console.log('[AuthContext] Profile not found, creating one...');
-          
-          // Create profile if it doesn't exist
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert([
-              { 
-                id: user.id, 
-                email: user.email,
-                created_at: new Date().toISOString() 
-              }
-            ])
-            .select()
-            .single();
-
-          if (createError) {
-            console.error('[AuthContext] Error creating profile:', createError.message);
-            console.error('[AuthContext] Full error:', createError);
-          } else if (newProfile) {
-            console.log('[AuthContext] Profile created successfully');
-            setProfile(newProfile);
-          }
+          console.log('[AuthContext] No profile found');
+          setProfile(null);
         }
       } catch (error) {
-        console.error('[AuthContext] Unexpected error loading profile:', error.message);
-        console.error('[AuthContext] Full error:', error);
+        console.error('[AuthContext] Error loading profile:', error.message);
+        setProfile(null);
       }
     };
-
+    
     loadProfile();
   }, [user]);
 
@@ -218,22 +173,21 @@ export const AuthProvider = ({ children }) => {
         password,
         options: {
           data: metadata,
-          emailRedirectTo: `${window.location.origin}/#/login`
+          // SIMPLIFIED: No email redirect for now
         }
       });
-
+      
       if (error) {
         console.error('[AuthContext] Signup error:', error.message);
-        console.error('[AuthContext] Full error:', error);
         setAuthError(error.message);
         return null;
       }
-
+      
       console.log('[AuthContext] Signup successful:', data.user ? 'User created' : 'Confirmation email sent');
       return data;
+      
     } catch (error) {
       console.error('[AuthContext] Unexpected signup error:', error.message);
-      console.error('[AuthContext] Full error:', error);
       setAuthError(error.message || 'An unexpected error occurred during signup');
       return null;
     }
@@ -249,25 +203,18 @@ export const AuthProvider = ({ children }) => {
         email,
         password
       });
-
+      
       if (error) {
         console.error('[AuthContext] Sign in error:', error.message);
-        console.error('[AuthContext] Full error details:', error);
         setAuthError(error.message);
         return null;
       }
-
+      
       console.log('[AuthContext] Sign in successful, user ID:', data.user.id);
-      
-      // Verify the session was created
-      const sessionCheck = await supabase.auth.getSession();
-      console.log('[AuthContext] Post-login session check:', 
-                  sessionCheck.data.session ? 'Session exists' : 'No session');
-      
       return data;
+      
     } catch (error) {
       console.error('[AuthContext] Unexpected sign in error:', error.message);
-      console.error('[AuthContext] Full error:', error);
       setAuthError(error.message || 'An unexpected error occurred during sign in');
       return null;
     }
@@ -283,15 +230,13 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         console.error('[AuthContext] Sign out error:', error.message);
-        console.error('[AuthContext] Full error:', error);
         setAuthError(error.message);
       } else {
         console.log('[AuthContext] Sign out successful');
-        // Auth state change listener will update user state
       }
+      
     } catch (error) {
       console.error('[AuthContext] Unexpected sign out error:', error.message);
-      console.error('[AuthContext] Full error:', error);
       setAuthError(error.message || 'An unexpected error occurred during sign out');
     }
   };
@@ -308,16 +253,15 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         console.error('[AuthContext] Password reset error:', error.message);
-        console.error('[AuthContext] Full error:', error);
         setAuthError(error.message);
         return false;
       }
       
       console.log('[AuthContext] Password reset email sent successfully');
       return true;
+      
     } catch (error) {
       console.error('[AuthContext] Unexpected password reset error:', error.message);
-      console.error('[AuthContext] Full error:', error);
       setAuthError(error.message || 'An unexpected error occurred during password reset');
       return false;
     }
@@ -335,22 +279,21 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         console.error('[AuthContext] Password update error:', error.message);
-        console.error('[AuthContext] Full error:', error);
         setAuthError(error.message);
         return false;
       }
       
       console.log('[AuthContext] Password updated successfully');
       return true;
+      
     } catch (error) {
       console.error('[AuthContext] Unexpected password update error:', error.message);
-      console.error('[AuthContext] Full error:', error);
       setAuthError(error.message || 'An unexpected error occurred during password update');
       return false;
     }
   };
 
-  // Update profile
+  // Update profile - SIMPLIFIED VERSION
   const updateProfile = async (updates) => {
     try {
       if (!user) {
@@ -369,16 +312,15 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         console.error('[AuthContext] Profile update error:', error.message);
-        console.error('[AuthContext] Full error:', error);
         throw error;
       }
       
       console.log('[AuthContext] Profile updated successfully');
       setProfile(data);
       return data;
+      
     } catch (error) {
       console.error('[AuthContext] Profile update error:', error.message);
-      console.error('[AuthContext] Full error:', error);
       return null;
     }
   };

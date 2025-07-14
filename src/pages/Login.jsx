@@ -27,13 +27,13 @@ const Login = () => {
     loginAttempted
   });
 
-  // Redirect if already logged in
+  // SIMPLIFIED APPROACH: Only redirect if user is authenticated and we're not loading
   useEffect(() => {
-    if (user) {
-      console.log('[Login] User already logged in, redirecting to home');
-      navigate('/home'); // Redirect to /home if already logged in
+    if (user && !loading) {
+      console.log('[Login] User authenticated, redirecting to home');
+      navigate('/home');
     }
-  }, [user, navigate]);
+  }, [user, navigate, loading]);
 
   // Clear any auth errors when the component unmounts
   useEffect(() => {
@@ -44,7 +44,6 @@ const Login = () => {
 
   const validateForm = () => {
     setFormError('');
-    
     if (!email.trim()) {
       setFormError('Email is required');
       return false;
@@ -81,6 +80,8 @@ const Login = () => {
     console.log('[Login] Attempting to sign in user with email:', email);
     
     try {
+      // SIMPLIFIED APPROACH: Log all steps in the login process
+      console.log('[Login] Calling signIn function...');
       const result = await signIn(email, password);
       console.log('[Login] Sign in result:', result ? 'Success' : 'Failed');
       
@@ -88,7 +89,7 @@ const Login = () => {
         console.log('[Login] Login successful for user:', result.user.id);
         console.log('[Login] Redirecting to home page...');
         
-        // Force immediate redirect to home
+        // SIMPLIFIED APPROACH: Force immediate redirect to home
         navigate('/home', { replace: true });
       } else {
         console.error('[Login] Login failed - no user returned');
@@ -109,7 +110,6 @@ const Login = () => {
   }
 
   console.log('[Login] Rendering login form');
-  
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md">
