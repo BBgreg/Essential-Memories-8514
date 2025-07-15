@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
@@ -8,11 +9,16 @@ const { FiArrowLeft, FiUser, FiMail, FiLock, FiLogOut } = FiIcons;
 
 const Profile = () => {
   const navigate = useNavigate();
+  const { user, profile, signOut } = useAuth();
   
-  const handleSignOut = () => {
-    console.log('Mock sign out called');
-    // Simply redirect to login (no actual backend logout)
-    navigate('/login');
+  const handleSignOut = async () => {
+    console.log('Sign out requested');
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
   return (
@@ -41,10 +47,12 @@ const Profile = () => {
         {/* Profile picture placeholder */}
         <div className="flex flex-col items-center mb-6">
           <div className="w-24 h-24 bg-gradient-to-r from-vibrant-pink to-vibrant-teal rounded-full flex items-center justify-center text-white text-3xl font-bold mb-3">
-            U
+            {user?.user_metadata?.display_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
           </div>
-          <p className="text-lg font-semibold text-text-primary">User</p>
-          <p className="text-text-secondary text-sm">user@example.com</p>
+          <p className="text-lg font-semibold text-text-primary">
+            {user?.user_metadata?.display_name || 'User'}
+          </p>
+          <p className="text-text-secondary text-sm">{user?.email || 'user@example.com'}</p>
         </div>
 
         <div className="space-y-6">
@@ -53,14 +61,18 @@ const Profile = () => {
               <p className="text-sm text-text-secondary mb-1">Display Name</p>
               <div className="flex items-center">
                 <SafeIcon icon={FiUser} className="w-5 h-5 text-text-secondary mr-3" />
-                <p className="text-text-primary font-medium">User</p>
+                <p className="text-text-primary font-medium">
+                  {user?.user_metadata?.display_name || 'User'}
+                </p>
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-2xl">
               <p className="text-sm text-text-secondary mb-1">Email Address</p>
               <div className="flex items-center">
                 <SafeIcon icon={FiMail} className="w-5 h-5 text-text-secondary mr-3" />
-                <p className="text-text-primary font-medium">user@example.com</p>
+                <p className="text-text-primary font-medium">
+                  {user?.email || 'user@example.com'}
+                </p>
               </div>
             </div>
           </div>

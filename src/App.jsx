@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { MemoryProvider } from './contexts/MemoryContext';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Import pages
 import Login from './pages/Login';
@@ -52,13 +53,13 @@ function App() {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
 
-                {/* All routes are accessible now (no authentication) */}
-                <Route path="/home" element={<Home />} />
-                <Route path="/add" element={<AddMemory />} />
-                <Route path="/calendar" element={<Calendar />} />
-                <Route path="/flashcards" element={<Flashcards />} />
-                <Route path="/statistics" element={<Statistics />} />
-                <Route path="/profile" element={<Profile />} />
+                {/* Protected routes */}
+                <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                <Route path="/add" element={<ProtectedRoute><AddMemory /></ProtectedRoute>} />
+                <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+                <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
+                <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/login" replace />} />

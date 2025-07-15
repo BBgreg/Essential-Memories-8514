@@ -1,29 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiMail, FiLock, FiUser, FiEye, FiEyeOff, FiCheckCircle } = FiIcons;
+const { FiMail, FiLock, FiUser, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle } = FiIcons;
 
 const Signup = () => {
   const navigate = useNavigate();
+  const { signUp, user, loading, authError, clearAuthError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
 
-  // Simplified form handling with no backend
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Signup form submitted with:', { email, displayName });
-    
-    // Mock successful signup - simply show success message
-    setSignupSuccess(true);
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/home');
+    }
+  }, [user, navigate]);
+
+  // Clear any auth errors when the component unmounts
+  useEffect(() => {
+    return () => {
+      clearAuthError();
+    };
+  }, [clearAuthError]);
+
+  const validateForm = () => {
+    setFormError('');
+
+    if (!email.trim()) {
+      setFormError('Email is required');
+      return false;
+    }
+
+    if (!password) {
+      setFormError('Password is required');
+      return false;
+    }
+
+    if (password.length < 6) {
+      setFormError('Password must be at least 6 characters');
+      return false;
+    }
+
+    if (password !== confirmPassword) {
+      setFormError('Passwords do not match');
+      return false;
+    }
+
+    return true;
   };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const { user: newUser, error } = await signUp(email, password, {
+        displayName: displayName.trim()
+      });
+
+      if (newUser && !error) {
+        setSignupSuccess(true);
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return null; // Will show the LoadingScreen from Layout
+  }
 
   // Success state - email verification message
   if (signupSuccess) {
@@ -38,14 +99,14 @@ const Signup = () => {
             <SafeIcon icon={FiCheckCircle} className="w-8 h-8 text-green-600" />
           </div>
           
-          <h2 className="text-2xl font-bold text-text-primary mb-4">Account Created!</h2>
+          <h2 className="text-2xl font-bold text-text-primary mb-4">Check Your Email</h2>
           
           <div className="space-y-4 text-text-secondary">
             <p>
-              Your account has been created successfully.
+              We've sent a confirmation email to <span className="font-medium">{email}</span>
             </p>
             <p>
-              In a real app, you would receive a confirmation email.
+              Please check your inbox and click the confirmation link to activate your account.
             </p>
           </div>
 
@@ -59,6 +120,9 @@ const Signup = () => {
                 Go to Login
               </motion.button>
             </Link>
+            <p className="text-sm text-text-secondary">
+              Didn't receive the email? Check your spam folder or try signing up again.
+            </p>
           </div>
         </motion.div>
       </div>
@@ -79,6 +143,17 @@ const Signup = () => {
             <h1 className="text-3xl font-bold gradient-text mb-2">Essential Memories</h1>
             <p className="text-text-secondary">Create your account to get started</p>
           </div>
+
+          {(authError || formError) && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-50 text-red-600 rounded-xl p-4 mb-6 flex items-center"
+            >
+              <SafeIcon icon={FiAlertCircle} className="w-5 h-5 mr-2 flex-shrink-0" />
+              <p className="text-sm">{formError || authError}</p>
+            </motion.div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Display Name */}
@@ -173,9 +248,10 @@ const Signup = () => {
               type="submit"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg"
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
             >
-              Create Account
+              {isSubmitting ? 'Creating Account...' : 'Create Account'}
             </motion.button>
           </form>
 

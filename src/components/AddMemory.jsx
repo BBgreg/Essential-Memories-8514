@@ -38,6 +38,7 @@ const AddMemory = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     if (!user) {
       setError('You must be logged in to add a memory');
       return;
@@ -50,7 +51,7 @@ const AddMemory = () => {
 
     setIsSubmitting(true);
     setError('');
-    
+
     try {
       console.log('Adding memory with user ID:', user.id);
       console.log('Memory data:', formData);
@@ -73,10 +74,7 @@ const AddMemory = () => {
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   if (showSuccess) {
@@ -92,8 +90,7 @@ const AddMemory = () => {
           </div>
           <h2 className="text-2xl font-bold text-text-primary">Memory Added!</h2>
           <p className="text-text-secondary">
-            {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been
-            saved successfully.
+            {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been saved successfully.
           </p>
         </motion.div>
       </div>
@@ -146,11 +143,7 @@ const AddMemory = () => {
             type="text"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            placeholder={
-              formData.type === 'birthday'
-                ? 'e.g., John Smith'
-                : 'e.g., Wedding Anniversary, Christmas'
-            }
+            placeholder={formData.type === 'birthday' ? 'e.g., John Smith' : 'e.g., Wedding Anniversary, Christmas'}
             className="w-full p-4 rounded-2xl border border-gray-200 focus:border-vibrant-pink focus:outline-none bg-white/60 backdrop-blur-sm"
             required
           />

@@ -9,7 +9,7 @@ const { FiLoader, FiAlertCircle, FiRefreshCw } = FiIcons;
 const LoadingScreen = ({ 
   message = 'Loading your memories...', 
   error = null, 
-  onRetry = null,
+  onRetry = null, 
   showRetry = false 
 }) => {
   const [showRetryButton, setShowRetryButton] = useState(false);
@@ -37,6 +37,7 @@ const LoadingScreen = ({
         console.log('[LoadingScreen] Showing retry button after delay');
         setShowRetryButton(true);
       }, 3000);
+
       return () => clearTimeout(timer);
     }
   }, [error]);
@@ -47,7 +48,7 @@ const LoadingScreen = ({
       setLoadingTime(prev => {
         const newTime = prev + 1;
         console.log('[LoadingScreen] Loading time:', newTime, 'seconds');
-
+        
         // At 4 seconds, try auto-refreshing the session if we haven't already
         if (newTime === 4 && !refreshAttempted && !error) {
           console.log('[LoadingScreen] Auto-attempting session refresh after 4s delay');
@@ -56,7 +57,7 @@ const LoadingScreen = ({
             console.log('[LoadingScreen] Auto session refresh result:', success ? 'Success' : 'Failed');
           });
         }
-
+        
         return newTime;
       });
     }, 1000);
@@ -88,7 +89,7 @@ const LoadingScreen = ({
     
     // Call the provided retry function
     if (onRetry) onRetry();
-
+    
     // For very long loading times, force page reload
     if (loadingTime > 12) {
       console.log('[LoadingScreen] Long loading time detected, forcing page reload');

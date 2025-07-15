@@ -1,22 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useMemory } from '../contexts/MemoryContext';
+import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import DateField from '../components/DateField';
-import { useMemory } from '../contexts/MemoryContext';
 
-const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck } = FiIcons;
+const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck, FiAlertCircle } = FiIcons;
 
 const AddMemory = () => {
   const navigate = useNavigate();
   const { addMemory } = useMemory();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     date: '',
     type: 'birthday'
   });
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Verify user authentication
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
   const memoryTypes = [
     { id: 'birthday', label: 'Birthday', icon: FiGift, color: 'from-pastel-pink to-vibrant-pink' },
@@ -27,19 +38,38 @@ const AddMemory = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Add memory form submitted with:', formData);
     
+    if (!user) {
+      setError('You must be logged in to add a memory');
+      return;
+    }
+
+    if (!formData.name.trim() || !formData.date) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
     try {
-      // Call mock addMemory function (no actual backend persistence)
-      await addMemory(formData);
-      setShowSuccess(true);
+      console.log('Adding memory with user ID:', user.id);
+      console.log('Memory data:', formData);
       
-      // Redirect after a delay
+      await addMemory({
+        ...formData,
+        userId: user.id // Explicitly pass the user ID to ensure it's used in the database operation
+      });
+      
+      setShowSuccess(true);
       setTimeout(() => {
-        navigate('/');
+        navigate('/home');
       }, 2000);
     } catch (error) {
       console.error('Error adding memory:', error);
+      setError(error.message || 'Failed to add memory. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -62,9 +92,6 @@ const AddMemory = () => {
           <p className="text-text-secondary">
             {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been saved successfully.
           </p>
-          <div className="text-sm text-text-secondary">
-            Date: {formData.date} (MM/DD)
-          </div>
         </motion.div>
       </div>
     );
@@ -87,6 +114,18 @@ const AddMemory = () => {
           <p className="text-text-secondary">Create a new special date to remember</p>
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 text-red-600 rounded-xl p-4 flex items-center"
+        >
+          <SafeIcon icon={FiAlertCircle} className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{error}</p>
+        </motion.div>
+      )}
 
       {/* Form */}
       <motion.form
@@ -115,7 +154,7 @@ const AddMemory = () => {
           )}
         </div>
 
-        {/* Date Field - Using the custom DateField component */}
+        {/* Date Field */}
         <DateField
           value={formData.date}
           onChange={(date) => handleChange('date', date)}
@@ -153,10 +192,10 @@ const AddMemory = () => {
           type="submit"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          disabled={!formData.name.trim() || !formData.date}
+          disabled={isSubmitting || !formData.name.trim() || !formData.date}
           className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Add Memory
+          {isSubmitting ? 'Adding Memory...' : 'Add Memory'}
         </motion.button>
       </motion.form>
     </div>

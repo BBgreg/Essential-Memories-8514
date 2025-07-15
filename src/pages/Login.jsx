@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
@@ -8,19 +9,46 @@ const { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle } = FiIcons;
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signIn, user, loading, authError, clearAuthError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
-  // Simplified form handling with no backend
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/home');
+    }
+  }, [user, navigate]);
+
+  // Clear any auth errors when the component unmounts
+  useEffect(() => {
+    return () => {
+      clearAuthError();
+    };
+  }, [clearAuthError]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login form submitted with:', { email });
-    
-    // Mock successful login - simply redirect to home
-    // In a real app, this would authenticate with a backend
-    navigate('/home');
+    setIsSubmitting(true);
+
+    try {
+      const { user: loggedInUser, error } = await signIn(email, password);
+      
+      if (loggedInUser && !error) {
+        navigate('/home');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return null; // Will show the LoadingScreen from Layout
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -35,6 +63,17 @@ const Login = () => {
             <h1 className="text-3xl font-bold gradient-text mb-2">Essential Memories</h1>
             <p className="text-text-secondary">Welcome back! Log in to your account</p>
           </div>
+
+          {authError && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-50 text-red-600 rounded-xl p-4 mb-6 flex items-center"
+            >
+              <SafeIcon icon={FiAlertCircle} className="w-5 h-5 mr-2 flex-shrink-0" />
+              <p className="text-sm">{authError}</p>
+            </motion.div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -87,9 +126,10 @@ const Login = () => {
               type="submit"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg"
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
             >
-              Log In
+              {isSubmitting ? 'Signing In...' : 'Log In'}
             </motion.button>
           </form>
 

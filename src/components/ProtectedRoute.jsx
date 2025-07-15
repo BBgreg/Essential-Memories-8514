@@ -1,14 +1,20 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import LoadingScreen from './LoadingScreen';
 
-// Simplified ProtectedRoute that doesn't rely on authentication state
 const ProtectedRoute = ({ children }) => {
-  // Since we've removed authentication, this component simply renders children
-  // In a real app, this would check auth state
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen message="Checking authentication..." />;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
   return children;
-  
-  // Uncomment the following to simulate a "must login" experience:
-  // return <Navigate to="/login" replace />;
 };
 
 export default ProtectedRoute;
