@@ -91,7 +91,7 @@ const Layout = ({ children }) => {
               console.error('[Layout] Session refresh failed:', err.message);
             });
           }
-
+          
           // Force exit from loading state after 6 seconds
           if (newDuration >= 6 && !forceExit) {
             console.warn('[Layout] ⚠️ Forcing exit from loading state after timeout (6s)');
@@ -144,10 +144,11 @@ const Layout = ({ children }) => {
   const errorMessage = authError || memoryError || "There was a problem loading the app.";
   
   // Dynamic loading message based on state
-  const loadingMessage = 
-    authLoading ? "Checking authentication..." : 
-    memoryLoading ? "Loading your memories..." : 
-    "Initializing app...";
+  const loadingMessage = authLoading 
+    ? "Checking authentication..." 
+    : memoryLoading 
+      ? "Loading your memories..." 
+      : "Initializing app...";
 
   return (
     <div className="app-container min-h-screen relative">

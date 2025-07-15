@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import supabase from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import supabase, { refreshSession } from '../lib/supabase';
 
 // Create auth context with default values
 const AuthContext = createContext({
@@ -29,6 +30,7 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const navigate = useNavigate();
 
   // Clear any auth errors
   const clearAuthError = () => {
@@ -47,6 +49,7 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       try {
         if (!supabase) {
+          console.error('[AuthContext] FATAL ERROR: Supabase client not initialized');
           throw new Error("Supabase client not initialized due to config error.");
         }
 
@@ -80,11 +83,12 @@ export const AuthProvider = ({ children }) => {
         const getSessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => {
+            console.error('[AuthContext] Authentication check timed out after 10 seconds');
             reject(new Error("Authentication check timed out after 10 seconds"));
           }, 10000);
         });
 
-        const { data: { session }, error: getSessionError } = await Promise.race([
+        const sessionResult = await Promise.race([
           getSessionPromise,
           timeoutPromise
         ]);
@@ -94,6 +98,8 @@ export const AuthProvider = ({ children }) => {
           timeoutId = null;
         }
 
+        const { data: { session }, error: getSessionError } = sessionResult;
+
         console.log('[AuthContext] Initial session check result:', {
           hasSession: !!session,
           userId: session?.user?.id,
@@ -102,10 +108,24 @@ export const AuthProvider = ({ children }) => {
 
         if (getSessionError) {
           console.error('[AuthContext] Session check error:', getSessionError);
-          throw getSessionError;
-        }
-
-        if (mounted) {
+          // Try refreshing session once on error
+          const refreshed = await refreshSession();
+          console.log('[AuthContext] Session refresh attempt result:', refreshed ? 'Success' : 'Failed');
+          
+          if (!refreshed) {
+            throw getSessionError;
+          }
+          
+          // If refresh succeeded, get the session again
+          const { data: refreshData } = await supabase.auth.getSession();
+          if (refreshData.session) {
+            setUser(refreshData.session.user);
+            await loadUserProfile(refreshData.session.user.id);
+          } else {
+            setUser(null);
+            setProfile(null);
+          }
+        } else if (mounted) {
           if (session) {
             setUser(session.user);
             await loadUserProfile(session.user.id);
@@ -125,7 +145,7 @@ export const AuthProvider = ({ children }) => {
       } finally {
         if (mounted) {
           setLoading(false);
-          console.log('[AuthContext] Auth initialization complete');
+          console.log('[AuthContext] Auth initialization complete, loading set to false');
         }
       }
     };
@@ -134,6 +154,7 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       mounted = false;
+      console.log('[AuthContext] Cleanup: Unsubscribing from auth listener');
       if (authListener?.subscription) {
         authListener.subscription.unsubscribe();
       }
@@ -141,7 +162,7 @@ export const AuthProvider = ({ children }) => {
         clearTimeout(timeoutId);
       }
     };
-  }, []);
+  }, [navigate]);
 
   // Load user profile
   const loadUserProfile = async (userId) => {
@@ -179,6 +200,8 @@ export const AuthProvider = ({ children }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('No user data available');
 
+      console.log('[AuthContext] Creating profile for user:', userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .insert([
@@ -216,7 +239,8 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
         options: {
-          data: metadata
+          data: metadata,
+          emailRedirectTo: `${window.location.origin}/#/login`
         }
       });
 
@@ -273,6 +297,8 @@ export const AuthProvider = ({ children }) => {
         setAuthError(error.message);
       } else {
         console.log('[AuthContext] Sign out successful');
+        // Force navigation to login page after sign out
+        navigate('/login', { replace: true });
       }
     } catch (error) {
       console.error('[AuthContext] Unexpected sign out error:', error.message);

@@ -9,7 +9,7 @@ const { FiMail, FiLock, FiUser, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle } 
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { signUp, authError, clearAuthError, user } = useAuth();
+  const { signUp, authError, clearAuthError, user, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -26,16 +26,19 @@ const Signup = () => {
     signupSuccess,
     isSubmitting,
     authError,
-    formError
+    formError,
+    isAuthenticated: !!user,
+    isLoading: loading,
+    currentPath: window.location.hash
   });
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
+    if (!loading && user) {
       console.log('[Signup] User already logged in, redirecting to home');
       navigate('/home');
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
 
   // Clear auth errors on unmount
   useEffect(() => {
@@ -103,10 +106,23 @@ const Signup = () => {
       }
     } catch (error) {
       console.error('[Signup] Signup error:', error);
+      setFormError(error.message || 'An unexpected error occurred during signup');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Show loading if auth is still initializing
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-vibrant-pink border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-lg font-medium text-text-primary">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Success state - email verification message
   if (signupSuccess) {

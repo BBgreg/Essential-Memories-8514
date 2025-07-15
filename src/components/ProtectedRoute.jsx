@@ -18,6 +18,7 @@ const ProtectedRoute = ({ children }) => {
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-vibrant-pink border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-lg font-medium text-text-primary">Checking authentication...</p>
+          <p className="text-sm text-text-secondary">This should only take a moment...</p>
         </div>
       </div>
     );

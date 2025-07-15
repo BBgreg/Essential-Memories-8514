@@ -20,7 +20,8 @@ const Login = () => {
     isAuthenticated: !!user,
     isLoading: loading,
     hasAuthError: !!authError,
-    hasFormError: !!formError
+    hasFormError: !!formError,
+    currentPath: window.location.hash
   });
 
   // Redirect if already authenticated
@@ -73,9 +74,12 @@ const Login = () => {
       if (result) {
         console.log('[Login] Login successful, redirecting to home');
         navigate('/home', { replace: true });
+      } else {
+        console.log('[Login] Login failed, no result returned');
       }
     } catch (error) {
       console.error('[Login] Login error:', error);
+      setFormError(error.message || 'An unexpected error occurred during login');
     } finally {
       setIsSubmitting(false);
     }

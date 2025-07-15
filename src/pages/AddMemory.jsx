@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useMemory } from '../contexts/MemoryContext';
+import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import DateField from '../components/DateField';
@@ -12,6 +13,7 @@ const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck, FiAlertCircle
 const AddMemory = () => {
   const navigate = useNavigate();
   const { addMemory } = useMemory();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     date: '',
@@ -20,6 +22,14 @@ const AddMemory = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Verify user authentication
+  useEffect(() => {
+    if (!user) {
+      console.log('[AddMemory] No authenticated user, redirecting to login');
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
   const memoryTypes = [
     { id: 'birthday', label: 'Birthday', icon: FiGift, color: 'from-pastel-pink to-vibrant-pink' },
@@ -30,18 +40,17 @@ const AddMemory = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // CRITICAL: Verify current user is authenticated
     const currentUser = supabase.auth.currentUser;
-    
     if (!currentUser || !currentUser.id) {
-      console.error('No authenticated user found in current session during form submit');
+      console.error('[AddMemory] No authenticated user found in current session during form submit');
       setError('You must be logged in to add a memory. Please try logging out and back in.');
       return;
     }
-    
-    console.log('Current authenticated user ID:', currentUser.id);
-    
+
+    console.log('[AddMemory] Current authenticated user ID:', currentUser.id);
+
     if (!formData.name.trim() || !formData.date) {
       setError('Please fill in all required fields');
       return;
@@ -49,28 +58,28 @@ const AddMemory = () => {
 
     setIsSubmitting(true);
     setError('');
-    
+
     try {
-      console.log('Adding memory with user ID:', currentUser.id);
-      console.log('Memory data:', formData);
-      
+      console.log('[AddMemory] Adding memory with user ID:', currentUser.id);
+      console.log('[AddMemory] Memory data:', formData);
+
       const result = await addMemory({
         ...formData,
-        userId: currentUser.id // Explicitly pass the user ID to ensure it's used
+        userId: currentUser.id // Explicitly pass the user ID to ensure it's used in the database operation
       });
-      
-      console.log('Memory added result:', result);
-      
+
+      console.log('[AddMemory] Memory added result:', result);
+
       if (!result || !result.id) {
         throw new Error('Failed to add memory. Please try again.');
       }
-      
+
       setShowSuccess(true);
       setTimeout(() => {
         navigate('/');
       }, 2000);
     } catch (error) {
-      console.error('Error adding memory:', error);
+      console.error('[AddMemory] Error adding memory:', error);
       setError(error.message || 'Failed to add memory. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -78,10 +87,7 @@ const AddMemory = () => {
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   if (showSuccess) {
@@ -97,8 +103,7 @@ const AddMemory = () => {
           </div>
           <h2 className="text-2xl font-bold text-text-primary">Memory Added!</h2>
           <p className="text-text-secondary">
-            {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been
-            saved successfully.
+            {formData.type === 'birthday' ? `${formData.name}'s Birthday` : formData.name} has been saved successfully.
           </p>
           <div className="text-sm text-text-secondary">
             Date: {formData.date} (MM/DD)
@@ -154,17 +159,13 @@ const AddMemory = () => {
             type="text"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            placeholder={
-              formData.type === 'birthday'
-                ? 'e.g., John Smith'
-                : 'e.g., Wedding Anniversary, Christmas'
-            }
+            placeholder={formData.type === 'birthday' ? 'e.g., John Smith' : 'e.g., Wedding Anniversary, Christmas'}
             className="w-full p-4 rounded-2xl border border-gray-200 focus:border-vibrant-pink focus:outline-none bg-white/60 backdrop-blur-sm"
             required
           />
           {formData.type === 'birthday' && (
             <p className="text-xs text-text-secondary italic">
-              Will be displayed as "{formData.name ? `${formData.name}'s Birthday` : 'Name\'s Birthday'}"
+              Will be displayed as "{formData.name ? `${formData.name}'s Birthday` : "Name's Birthday"}"
             </p>
           )}
         </div>

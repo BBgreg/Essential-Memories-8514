@@ -55,7 +55,6 @@ export const MemoryProvider = ({ children }) => {
 
     if (!profile) {
       console.log('[MemoryContext] No profile found, creating one...');
-      
       // Create profile if it doesn't exist
       const { error: createError } = await supabase
         .from('profiles')
@@ -101,7 +100,7 @@ export const MemoryProvider = ({ children }) => {
         console.error('[MemoryContext] No authenticated user found in current session');
         throw new Error('You must be logged in to add a memory. Please try logging out and back in.');
       }
-      
+
       // Use the explicit user ID from the current auth session
       const userId = currentUser.id;
       console.log('[MemoryContext] Using authenticated user ID for memory:', userId);
@@ -113,9 +112,7 @@ export const MemoryProvider = ({ children }) => {
       const memoryToInsert = {
         user_id: userId, // CRITICAL: Use the explicit user ID
         name: memoryData.name.trim(),
-        display_name: memoryData.type === 'birthday' 
-          ? `${memoryData.name.trim()}'s Birthday` 
-          : memoryData.name.trim(),
+        display_name: memoryData.type === 'birthday' ? `${memoryData.name.trim()}'s Birthday` : memoryData.name.trim(),
         month,
         day,
         category: memoryData.type,
@@ -158,6 +155,7 @@ export const MemoryProvider = ({ children }) => {
 
       setMemories(prev => [newMemory, ...prev]);
       console.log('[MemoryContext] Memory added successfully:', newMemory);
+
       return newMemory;
     } catch (error) {
       console.error('[MemoryContext] Error in addMemory:', error);
@@ -185,13 +183,13 @@ export const MemoryProvider = ({ children }) => {
         console.error('[MemoryContext] No authenticated user found in current session during loadMemories');
         throw new Error('Authentication session error. Please try logging out and back in.');
       }
-      
+
       console.log('[MemoryContext] Using authenticated user ID for loading memories:', currentUser.id);
 
       // Verify user profile first
       await verifyUserProfile();
-
       console.log('[MemoryContext] Fetching memories from database...');
+
       const { data, error: fetchError } = await supabase
         .from('dates')
         .select('*')
@@ -243,8 +241,9 @@ export const MemoryProvider = ({ children }) => {
         console.error('[MemoryContext] No authenticated user found in current session during loadStreaks');
         return;
       }
-      
+
       console.log('[MemoryContext] Loading streaks for user:', currentUser.id);
+
       const { data, error } = await supabase
         .from('streak_data')
         .select('*')
@@ -270,7 +269,6 @@ export const MemoryProvider = ({ children }) => {
         });
       } else {
         console.log('[MemoryContext] No streak data found, initializing streaks record...');
-        
         // Create initial streak record if it doesn't exist
         const { error: createError } = await supabase
           .from('streak_data')
@@ -306,24 +304,20 @@ export const MemoryProvider = ({ children }) => {
   const getUpcomingDates = () => {
     const today = new Date();
     const currentYear = today.getFullYear();
-    
+
     return memories.map(memory => {
       const [month, day] = memory.date.split('/').map(Number);
       let nextDate = new Date(currentYear, month - 1, day);
-      
+
       // If the date has passed this year, use next year
       if (nextDate < today) {
         nextDate = new Date(currentYear + 1, month - 1, day);
       }
-      
+
       const timeDiff = nextDate.getTime() - today.getTime();
       const daysUntil = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-      
-      return {
-        ...memory,
-        nextDate,
-        daysUntil
-      };
+
+      return { ...memory, nextDate, daysUntil };
     }).sort((a, b) => a.daysUntil - b.daysUntil);
   };
 
@@ -335,11 +329,11 @@ export const MemoryProvider = ({ children }) => {
   // Submit flashcard answer (placeholder)
   const submitFlashcardAnswer = async (memoryId, correct) => {
     console.log('[MemoryContext] Flashcard answer submitted:', { memoryId, correct });
-    
+
     try {
       const memory = memories.find(m => m.id === memoryId);
       if (!memory) return;
-      
+
       // Update local state first for immediate UI feedback
       const updatedMemories = memories.map(m => {
         if (m.id === memoryId) {
@@ -351,9 +345,9 @@ export const MemoryProvider = ({ children }) => {
         }
         return m;
       });
-      
+
       setMemories(updatedMemories);
-      
+
       // Then update the database
       const { error } = await supabase
         .from('dates')
@@ -362,7 +356,7 @@ export const MemoryProvider = ({ children }) => {
           incorrect_count: correct ? (memory.incorrectCount || 0) : (memory.incorrectCount || 0) + 1
         })
         .eq('id', memoryId);
-        
+
       if (error) {
         console.error('[MemoryContext] Error updating flashcard stats:', error);
       }
@@ -380,55 +374,55 @@ export const MemoryProvider = ({ children }) => {
   // Mark today's question as answered (placeholder)
   const markTodaysQuestionAsAnswered = async (correct, memoryId) => {
     console.log('[MemoryContext] Marking today\'s question as answered:', { correct, memoryId });
-    
+
     try {
-      // Update the memory's stats
+      // Update the memory's stats if provided
       if (memoryId) {
         await submitFlashcardAnswer(memoryId, correct);
       }
-      
+
       // Get current user
       const currentUser = supabase.auth.currentUser;
       if (!currentUser || !currentUser.id) return;
-      
+
       // Update streak
       const today = new Date().toISOString().split('T')[0];
-      
+
       // Get current streak data
       const { data: streakData, error: streakError } = await supabase
         .from('streak_data')
         .select('*')
         .eq('user_id', currentUser.id)
         .single();
-        
+
       if (streakError && streakError.code !== 'PGRST116') {
         console.error('[MemoryContext] Error fetching streak data:', streakError);
         return;
       }
-      
+
       let newStreak = 1; // Start with 1 for today
       let bestStreak = 0;
-      
+
       if (streakData) {
         const lastQuestionDate = streakData.last_question_date;
         bestStreak = streakData.best_question_of_day_streak || 0;
-        
+
         // Check if streak continues
         if (lastQuestionDate) {
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayStr = yesterday.toISOString().split('T')[0];
-          
+
           if (lastQuestionDate === yesterdayStr) {
             newStreak = (streakData.question_of_day_streak || 0) + 1;
           }
         }
-        
+
         // Update best streak if needed
         if (newStreak > bestStreak) {
           bestStreak = newStreak;
         }
-        
+
         // Update streak data
         const { error: updateError } = await supabase
           .from('streak_data')
@@ -438,17 +432,14 @@ export const MemoryProvider = ({ children }) => {
             last_question_date: today
           })
           .eq('user_id', currentUser.id);
-          
+
         if (updateError) {
           console.error('[MemoryContext] Error updating streak data:', updateError);
         } else {
           // Update local state
           setStreaks(prev => ({
             ...prev,
-            questionOfDay: {
-              current: newStreak,
-              best: bestStreak
-            }
+            questionOfDay: { current: newStreak, best: bestStreak }
           }));
         }
       } else {
@@ -466,16 +457,13 @@ export const MemoryProvider = ({ children }) => {
               created_at: new Date().toISOString()
             }
           ]);
-          
+
         if (createError) {
           console.error('[MemoryContext] Error creating streak record:', createError);
         } else {
           setStreaks(prev => ({
             ...prev,
-            questionOfDay: {
-              current: 1,
-              best: 1
-            }
+            questionOfDay: { current: 1, best: 1 }
           }));
         }
       }
@@ -487,6 +475,7 @@ export const MemoryProvider = ({ children }) => {
   // Reload memories when user changes
   useEffect(() => {
     console.log('[MemoryContext] User changed, user:', user?.id);
+    
     if (user?.id) {
       loadMemories();
       loadStreaks();
