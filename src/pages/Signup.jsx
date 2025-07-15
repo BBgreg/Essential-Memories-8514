@@ -1,132 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiMail, FiLock, FiUser, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle } = FiIcons;
+const { FiMail, FiLock, FiUser, FiEye, FiEyeOff, FiCheckCircle } = FiIcons;
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { signUp, authError, clearAuthError, user, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
 
-  console.log('[Signup] Component state:', {
-    email,
-    signupSuccess,
-    isSubmitting,
-    authError,
-    formError,
-    isAuthenticated: !!user,
-    isLoading: loading,
-    currentPath: window.location.hash
-  });
-
-  // Redirect if already logged in
-  useEffect(() => {
-    if (!loading && user) {
-      console.log('[Signup] User already logged in, redirecting to home');
-      navigate('/home');
-    }
-  }, [user, loading, navigate]);
-
-  // Clear auth errors on unmount
-  useEffect(() => {
-    return () => {
-      clearAuthError();
-    };
-  }, [clearAuthError]);
-
-  const validateForm = () => {
-    setFormError('');
-
-    if (!email.trim()) {
-      setFormError('Email is required');
-      return false;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setFormError('Please enter a valid email address');
-      return false;
-    }
-
-    if (!password) {
-      setFormError('Password is required');
-      return false;
-    }
-
-    if (password.length < 6) {
-      setFormError('Password must be at least 6 characters');
-      return false;
-    }
-
-    if (password !== confirmPassword) {
-      setFormError('Passwords do not match');
-      return false;
-    }
-
-    if (!termsAccepted) {
-      setFormError('You must accept the Terms of Service and Privacy Policy');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
+  // Simplified form handling with no backend
+  const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('[Signup] Form submitted');
-
-    if (!validateForm()) {
-      console.log('[Signup] Form validation failed:', formError);
-      return;
-    }
-
-    setIsSubmitting(true);
-    console.log('[Signup] Attempting signup for email:', email);
-
-    try {
-      const result = await signUp(email, password, { display_name: displayName });
-      console.log('[Signup] Signup result:', result);
-
-      if (result) {
-        console.log('[Signup] Signup successful, showing success message');
-        setSignupSuccess(true);
-      }
-    } catch (error) {
-      console.error('[Signup] Signup error:', error);
-      setFormError(error.message || 'An unexpected error occurred during signup');
-    } finally {
-      setIsSubmitting(false);
-    }
+    console.log('Signup form submitted with:', { email, displayName });
+    
+    // Mock successful signup - simply show success message
+    setSignupSuccess(true);
   };
-
-  // Show loading if auth is still initializing
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-vibrant-pink border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-lg font-medium text-text-primary">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Success state - email verification message
   if (signupSuccess) {
-    console.log('[Signup] Rendering success state');
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <motion.div
@@ -138,17 +38,14 @@ const Signup = () => {
             <SafeIcon icon={FiCheckCircle} className="w-8 h-8 text-green-600" />
           </div>
           
-          <h2 className="text-2xl font-bold text-text-primary mb-4">Check Your Email</h2>
+          <h2 className="text-2xl font-bold text-text-primary mb-4">Account Created!</h2>
           
           <div className="space-y-4 text-text-secondary">
             <p>
-              We've sent a confirmation link to <strong>{email}</strong>
+              Your account has been created successfully.
             </p>
             <p>
-              Please check your email inbox (including spam/junk folder) and click the confirmation link to verify your account.
-            </p>
-            <p className="text-sm">
-              Once verified, you can log in and start using Essential Memories!
+              In a real app, you would receive a confirmation email.
             </p>
           </div>
 
@@ -162,21 +59,6 @@ const Signup = () => {
                 Go to Login
               </motion.button>
             </Link>
-            
-            <p className="text-sm text-text-secondary">
-              Didn't receive the email?{' '}
-              <button
-                onClick={() => {
-                  setSignupSuccess(false);
-                  setEmail('');
-                  setPassword('');
-                  setConfirmPassword('');
-                }}
-                className="text-vibrant-pink font-medium hover:underline"
-              >
-                Try again
-              </button>
-            </p>
           </div>
         </motion.div>
       </div>
@@ -184,7 +66,6 @@ const Signup = () => {
   }
 
   // Main signup form
-  console.log('[Signup] Rendering signup form');
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md">
@@ -198,17 +79,6 @@ const Signup = () => {
             <h1 className="text-3xl font-bold gradient-text mb-2">Essential Memories</h1>
             <p className="text-text-secondary">Create your account to get started</p>
           </div>
-
-          {(authError || formError) && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 text-red-600 rounded-xl p-4 mb-6 flex items-center"
-            >
-              <SafeIcon icon={FiAlertCircle} className="w-5 h-5 mr-2 flex-shrink-0" />
-              <p className="text-sm">{formError || authError}</p>
-            </motion.div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Display Name */}
@@ -298,37 +168,14 @@ const Signup = () => {
               </div>
             </div>
 
-            {/* Terms and Conditions */}
-            <div className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                id="terms"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="mt-1 w-4 h-4 text-vibrant-pink border-gray-300 rounded focus:ring-vibrant-pink"
-                required
-              />
-              <label htmlFor="terms" className="text-sm text-text-secondary">
-                I agree to the{' '}
-                <Link to="/terms" className="text-vibrant-pink hover:underline">
-                  Terms of Service
-                </Link>
-                {' '}and{' '}
-                <Link to="/privacy" className="text-vibrant-pink hover:underline">
-                  Privacy Policy
-                </Link>
-              </label>
-            </div>
-
             {/* Submit Button */}
             <motion.button
               type="submit"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              disabled={isSubmitting}
-              className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg"
             >
-              {isSubmitting ? 'Creating Account...' : 'Create Account'}
+              Create Account
             </motion.button>
           </form>
 

@@ -3,23 +3,14 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
-import { useAuth } from '../contexts/AuthContext';
 
 const { FiHome, FiPlus, FiCalendar, FiLayers, FiBarChart3, FiUser } = FiIcons;
 
 const Navbar = () => {
   const location = useLocation();
-  const { user } = useAuth();
-
-  console.log('Navbar rendering, current path:', location.pathname, 'user:', !!user);
-
-  // Don't render navbar if no user
-  if (!user) {
-    return null;
-  }
 
   const navItems = [
-    { path: '/home', icon: FiHome, label: 'Home' }, // CRITICAL CHANGE: Changed from '/' to '/home'
+    { path: '/home', icon: FiHome, label: 'Home' },
     { path: '/add', icon: FiPlus, label: 'Add' },
     { path: '/calendar', icon: FiCalendar, label: 'Calendar' },
     { path: '/flashcards', icon: FiLayers, label: 'Practice' },

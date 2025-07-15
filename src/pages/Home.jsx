@@ -2,29 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useMemory } from '../contexts/MemoryContext';
-import { format } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import QuestionOfTheDay from '../components/QuestionOfTheDay';
 
-const { FiPlus, FiZap, FiTrendingUp, FiCalendar, FiAlertCircle } = FiIcons;
+const { FiPlus, FiZap, FiTrendingUp, FiCalendar, FiGift } = FiIcons;
 
 const Home = () => {
-  const { 
-    memories, 
-    streaks, 
-    getUpcomingDates, 
-    getDisplayName, 
-    dataFetchAttempted, 
-    error 
-  } = useMemory();
-
-  console.log('Home component rendering, state:', {
-    memoriesCount: memories.length,
-    dataFetchAttempted,
-    error
-  });
-
+  const { memories, streaks, getUpcomingDates, getDisplayName } = useMemory();
   const upcomingDates = getUpcomingDates().slice(0, 3); // Show only 3 dates
 
   const StatCard = ({ title, value, subtitle, icon, color }) => (
@@ -61,35 +46,6 @@ const Home = () => {
     }
   };
 
-  // If there was an error fetching data but the loading state is complete
-  if (error && dataFetchAttempted) {
-    console.log('Rendering error state in Home component');
-    return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl max-w-sm w-full text-center space-y-4">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-            <SafeIcon icon={FiAlertCircle} className="w-8 h-8 text-red-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-text-primary">Something went wrong</h2>
-          <p className="text-text-secondary">
-            We couldn't load your memories. Please check your connection and try again.
-          </p>
-          <p className="text-sm text-red-600">{error}</p>
-          <Link to="/">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white px-6 py-3 rounded-xl font-semibold shadow-lg mt-2"
-            >
-              Refresh
-            </motion.button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  console.log('Rendering main Home content');
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -192,7 +148,7 @@ const Home = () => {
                   <div>
                     <p className="font-semibold text-white text-lg">{getDisplayName(memory)}</p>
                     <p className="text-white/80 text-sm">
-                      {format(memory.nextDate, 'MMMM d')} • {memory.type}
+                      {memory.date} • {memory.type}
                     </p>
                   </div>
                 </div>
@@ -214,7 +170,7 @@ const Home = () => {
       )}
 
       {/* Empty State */}
-      {memories.length === 0 && dataFetchAttempted && !error && (
+      {memories.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

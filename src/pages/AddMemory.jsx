@@ -1,35 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useMemory } from '../contexts/MemoryContext';
-import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import DateField from '../components/DateField';
-import supabase from '../lib/supabase';
+import { useMemory } from '../contexts/MemoryContext';
 
-const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck, FiAlertCircle } = FiIcons;
+const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck } = FiIcons;
 
 const AddMemory = () => {
   const navigate = useNavigate();
   const { addMemory } = useMemory();
-  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     date: '',
     type: 'birthday'
   });
   const [showSuccess, setShowSuccess] = useState(false);
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Verify user authentication
-  useEffect(() => {
-    if (!user) {
-      console.log('[AddMemory] No authenticated user, redirecting to login');
-      navigate('/login');
-    }
-  }, [user, navigate]);
 
   const memoryTypes = [
     { id: 'birthday', label: 'Birthday', icon: FiGift, color: 'from-pastel-pink to-vibrant-pink' },
@@ -40,49 +27,19 @@ const AddMemory = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // CRITICAL: Verify current user is authenticated
-    const currentUser = supabase.auth.currentUser;
-    if (!currentUser || !currentUser.id) {
-      console.error('[AddMemory] No authenticated user found in current session during form submit');
-      setError('You must be logged in to add a memory. Please try logging out and back in.');
-      return;
-    }
-
-    console.log('[AddMemory] Current authenticated user ID:', currentUser.id);
-
-    if (!formData.name.trim() || !formData.date) {
-      setError('Please fill in all required fields');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError('');
-
+    console.log('Add memory form submitted with:', formData);
+    
     try {
-      console.log('[AddMemory] Adding memory with user ID:', currentUser.id);
-      console.log('[AddMemory] Memory data:', formData);
-
-      const result = await addMemory({
-        ...formData,
-        userId: currentUser.id // Explicitly pass the user ID to ensure it's used in the database operation
-      });
-
-      console.log('[AddMemory] Memory added result:', result);
-
-      if (!result || !result.id) {
-        throw new Error('Failed to add memory. Please try again.');
-      }
-
+      // Call mock addMemory function (no actual backend persistence)
+      await addMemory(formData);
       setShowSuccess(true);
+      
+      // Redirect after a delay
       setTimeout(() => {
         navigate('/');
       }, 2000);
     } catch (error) {
-      console.error('[AddMemory] Error adding memory:', error);
-      setError(error.message || 'Failed to add memory. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error adding memory:', error);
     }
   };
 
@@ -130,18 +87,6 @@ const AddMemory = () => {
           <p className="text-text-secondary">Create a new special date to remember</p>
         </div>
       </div>
-
-      {/* Error Message */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 text-red-600 rounded-xl p-4 flex items-center"
-        >
-          <SafeIcon icon={FiAlertCircle} className="w-5 h-5 mr-2 flex-shrink-0" />
-          <p className="text-sm">{error}</p>
-        </motion.div>
-      )}
 
       {/* Form */}
       <motion.form
@@ -208,10 +153,10 @@ const AddMemory = () => {
           type="submit"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          disabled={isSubmitting || !formData.name.trim() || !formData.date}
+          disabled={!formData.name.trim() || !formData.date}
           className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? 'Adding Memory...' : 'Add Memory'}
+          Add Memory
         </motion.button>
       </motion.form>
     </div>
