@@ -1,10 +1,9 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { MemoryProvider } from './contexts/MemoryContext'; // Updated import
+import { MemoryProvider } from './contexts/MemoryContext';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
-import ProtectedRoute from './components/ProtectedRoute';
 
 // Import pages
 import Login from './pages/Login';
@@ -23,52 +22,34 @@ import Privacy from './pages/Privacy';
 // Styles
 import './App.css';
 
-// Global error handler
-const GlobalErrorBoundary = ({ children }) => {
+function App() {
   return (
     <ErrorBoundary>
-      {children}
-    </ErrorBoundary>
-  );
-};
-
-function App() {
-  console.log('[App] Application starting...');
-  
-  return (
-    <GlobalErrorBoundary>
       <Router>
         <AuthProvider>
           <MemoryProvider>
             <Layout>
               <Routes>
-                {/* Root redirect */}
                 <Route path="/" element={<Navigate to="/login" replace />} />
-                
-                {/* Public routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
-                
-                {/* Protected routes */}
-                <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-                <Route path="/add" element={<ProtectedRoute><AddMemory /></ProtectedRoute>} />
-                <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-                <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
-                <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                
-                {/* Fallback */}
+                <Route path="/home" element={<Home />} />
+                <Route path="/add" element={<AddMemory />} />
+                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/flashcards" element={<Flashcards />} />
+                <Route path="/statistics" element={<Statistics />} />
+                <Route path="/profile" element={<Profile />} />
                 <Route path="*" element={<Navigate to="/login" replace />} />
               </Routes>
             </Layout>
           </MemoryProvider>
         </AuthProvider>
       </Router>
-    </GlobalErrorBoundary>
+    </ErrorBoundary>
   );
 }
 
