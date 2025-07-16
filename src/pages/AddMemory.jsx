@@ -11,7 +11,6 @@ const { FiArrowLeft, FiGift, FiHeart, FiStar, FiCalendar, FiCheck, FiAlertCircle
 
 const AddMemory = () => {
   console.log("DEBUG: AddMemory component rendering");
-  
   const navigate = useNavigate();
   const { addMemory } = useMemory();
   const { user } = useAuth();
@@ -64,60 +63,79 @@ const AddMemory = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log('DEBUG: AddMemory - Form submitted:', formData);
-    
+
     if (!user) {
       console.error('DEBUG: AddMemory - Submit attempted without user');
       setError('You must be logged in to add a memory');
       return;
     }
-    
+
     if (!formData.name.trim() || !formData.date) {
       console.error('DEBUG: AddMemory - Missing required fields');
       setError('Please fill in all required fields');
       return;
     }
-    
+
     setIsSubmitting(true);
     setError('');
-    
+
     try {
       console.log('DEBUG: AddMemory - Attempting to add memory:', {
         userId: user.id,
         ...formData
       });
-      
-      await addMemory({
-        ...formData,
-        userId: user.id
+
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out after 15 seconds')), 15000);
       });
-      
-      console.log('DEBUG: AddMemory - Memory added successfully');
+
+      // Race between the actual request and the timeout
+      const result = await Promise.race([
+        addMemory({ ...formData, userId: user.id }),
+        timeoutPromise
+      ]);
+
+      console.log('DEBUG: AddMemory - Memory added successfully:', result);
       setShowSuccess(true);
-      
+
+      // Use a timeout to navigate away after showing success
       setTimeout(() => {
         navigate('/');
       }, 2000);
+
     } catch (error) {
       console.error('DEBUG: AddMemory - Error:', error);
-      setError(error.message || 'Failed to add memory. Please try again.');
+      
+      // Specific error handling
+      if (error.message.includes('timeout')) {
+        setError('Request timed out. Please try again.');
+      } else if (error.message.includes('category')) {
+        setError('Database schema error. Please contact support.');
+      } else if (error.message.includes('permission')) {
+        setError('Permission denied. Please try logging out and back in.');
+      } else {
+        setError(error.message || 'Failed to add memory. Please try again.');
+      }
     } finally {
+      console.log('DEBUG: AddMemory - Operation completed, resetting submit state');
       setIsSubmitting(false);
     }
   };
 
   const handleChange = (field, value) => {
-    console.log(`DEBUG: AddMemory - Field changed: ${field} = ${value}`);
+    console.log(`DEBUG: AddMemory - Field changed: ${field}=${value}`);
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  console.log("DEBUG: AddMemory - Rendering with state:", { 
-    formData, 
-    showSuccess, 
-    hasError: !!error, 
-    isSubmitting 
+  console.log("DEBUG: AddMemory - Rendering with state:", {
+    formData,
+    showSuccess,
+    hasError: !!error,
+    isSubmitting
   });
 
   if (showSuccess) {
