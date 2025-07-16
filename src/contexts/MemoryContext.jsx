@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 
 // Create the context
 const MemoryContext = createContext({});
@@ -39,9 +39,9 @@ export const MemoryProvider = ({ children }) => {
         setLoading(true);
         setError(null);
 
-        // Fetch memories from Supabase
+        // Fetch memories from the new dates_esm1234567 table
         const { data: memoriesData, error: memoriesError } = await supabase
-          .from('memories_esm1234567')
+          .from('dates_esm1234567')
           .select('*')
           .eq('user_id', user.id);
 
@@ -53,13 +53,15 @@ export const MemoryProvider = ({ children }) => {
 
         // Process memories and add display properties
         const processedMemories = memoriesData.map(memory => {
-          const memoryDate = new Date(memory.memory_date);
-          const month = memoryDate.getMonth() + 1;
-          const day = memoryDate.getDate();
+          const month = memory.date_month;
+          const day = memory.date_day;
           const formattedDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
           
           return {
             ...memory,
+            id: memory.id,
+            name: memory.event_name,
+            type: memory.event_type.toLowerCase(),
             date: formattedDate,
             daysUntil: calculateDaysUntil(month, day),
             correctCount: 0,
@@ -72,7 +74,7 @@ export const MemoryProvider = ({ children }) => {
           const { data: practiceData, error: practiceError } = await supabase
             .from('practice_sessions_esm1234567')
             .select('is_correct')
-            .eq('memory_id', memory.id)
+            .eq('date_id', memory.id)
             .eq('user_id', user.id);
 
           if (!practiceError && practiceData) {
@@ -126,24 +128,24 @@ export const MemoryProvider = ({ children }) => {
     return differenceInDays(memoryDate, today);
   };
 
-  // Add a new memory
+  // Add a new memory using the new schema
   const addMemory = async (memoryData) => {
     if (!user) throw new Error('You must be logged in to add a memory');
 
     try {
       const [month, day] = memoryData.date.split('/').map(Number);
-      const currentYear = new Date().getFullYear();
       
       const newMemory = {
         user_id: user.id,
-        title: memoryData.name,
-        description: memoryData.notes || null,
-        memory_type: memoryData.type,
-        memory_date: `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        event_name: memoryData.name,
+        date_month: month,
+        date_day: day,
+        event_type: memoryData.type.charAt(0).toUpperCase() + memoryData.type.slice(1),
+        notes: memoryData.notes || null
       };
 
       const { data, error } = await supabase
-        .from('memories_esm1234567')
+        .from('dates_esm1234567')
         .insert(newMemory)
         .select()
         .single();
@@ -152,6 +154,8 @@ export const MemoryProvider = ({ children }) => {
 
       const formattedMemory = {
         ...data,
+        name: data.event_name,
+        type: data.event_type.toLowerCase(),
         date: memoryData.date,
         daysUntil: calculateDaysUntil(month, day),
         correctCount: 0,
@@ -166,7 +170,60 @@ export const MemoryProvider = ({ children }) => {
     }
   };
 
-  // Get memories for quiz
+  // Submit flashcard answer and record practice session
+  const submitFlashcardAnswer = async (dateId, isCorrect) => {
+    if (!user) throw new Error('You must be logged in to submit answers');
+
+    try {
+      // Record the practice session
+      const { error: sessionError } = await supabase
+        .from('practice_sessions_esm1234567')
+        .insert({
+          user_id: user.id,
+          date_id: dateId,
+          is_correct: isCorrect,
+          session_type: 'Flashcard'
+        });
+
+      if (sessionError) throw sessionError;
+
+      // Update streak data using RPC function
+      const { error: streakError } = await supabase.rpc('update_streak_data', {
+        p_user_id: user.id,
+        p_is_correct: isCorrect,
+        p_session_type: 'Flashcard'
+      });
+
+      if (streakError) throw streakError;
+
+      // Refresh streak data
+      const { data: streakData } = await supabase
+        .from('streak_data_esm1234567')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (streakData) {
+        setStreaks({
+          flashcard: {
+            current: streakData.flashcard_current_streak || 0,
+            best: streakData.flashcard_all_time_high || 0
+          },
+          questionOfDay: {
+            current: streakData.qotd_current_streak || 0,
+            best: streakData.qotd_all_time_high || 0
+          }
+        });
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error submitting flashcard answer:', error);
+      throw error;
+    }
+  };
+
+  // Get memories for quiz (prioritize those that need practice)
   const getMemoriesForQuiz = () => {
     if (memories.length === 0) return [];
     
@@ -174,10 +231,12 @@ export const MemoryProvider = ({ children }) => {
       const aTotal = a.correctCount + a.incorrectCount;
       const bTotal = b.correctCount + b.incorrectCount;
       
+      // Prioritize memories that haven't been practiced
       if (aTotal === 0 && bTotal === 0) return a.daysUntil - b.daysUntil;
       if (aTotal === 0) return -1;
       if (bTotal === 0) return 1;
       
+      // Then sort by accuracy (lowest first)
       const aAccuracy = a.correctCount / aTotal;
       const bAccuracy = b.correctCount / bTotal;
       
@@ -185,62 +244,119 @@ export const MemoryProvider = ({ children }) => {
     });
   };
 
-  // Update streak
+  // Update streak using RPC function
   const updateStreak = async (isCorrect, type = 'flashcard') => {
     if (!user) throw new Error('You must be logged in to update streaks');
 
     try {
-      let { data: currentStreak } = await supabase
+      const sessionType = type === 'flashcard' ? 'Flashcard' : 'Question of the Day';
+      
+      const { error } = await supabase.rpc('update_streak_data', {
+        p_user_id: user.id,
+        p_is_correct: isCorrect,
+        p_session_type: sessionType
+      });
+
+      if (error) throw error;
+
+      // Refresh streak data
+      const { data: streakData } = await supabase
         .from('streak_data_esm1234567')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (!currentStreak) {
-        const { data } = await supabase
-          .from('streak_data_esm1234567')
-          .insert({ user_id: user.id })
-          .select()
-          .single();
-        currentStreak = data;
+      if (streakData) {
+        const newStreaks = {
+          flashcard: {
+            current: streakData.flashcard_current_streak || 0,
+            best: streakData.flashcard_all_time_high || 0
+          },
+          questionOfDay: {
+            current: streakData.qotd_current_streak || 0,
+            best: streakData.qotd_all_time_high || 0
+          }
+        };
+        
+        setStreaks(newStreaks);
+        return newStreaks[type === 'flashcard' ? 'flashcard' : 'questionOfDay'];
       }
 
-      const currentField = type === 'flashcard' ? 'flashcard_current_streak' : 'qotd_current_streak';
-      const bestField = type === 'flashcard' ? 'flashcard_all_time_high' : 'qotd_all_time_high';
-      const dateField = type === 'flashcard' ? 'last_flashcard_date' : 'last_qod_date';
-
-      const newCurrentStreak = isCorrect ? (currentStreak[currentField] || 0) + 1 : 0;
-      const newBestStreak = Math.max(newCurrentStreak, currentStreak[bestField] || 0);
-
-      await supabase
-        .from('streak_data_esm1234567')
-        .update({
-          [currentField]: newCurrentStreak,
-          [bestField]: newBestStreak,
-          [dateField]: new Date().toISOString().split('T')[0]
-        })
-        .eq('user_id', user.id);
-
-      setStreaks(prev => ({
-        ...prev,
-        [type === 'flashcard' ? 'flashcard' : 'questionOfDay']: {
-          current: newCurrentStreak,
-          best: newBestStreak
-        }
-      }));
-
-      return { current: newCurrentStreak, best: newBestStreak };
+      return { current: 0, best: 0 };
     } catch (error) {
       console.error('Error updating streak:', error);
       throw error;
     }
   };
 
+  // Get "Needs Practice" memories
+  const getNeedsPracticeMemories = async (limit = 5) => {
+    if (!user) return [];
+
+    try {
+      // Fetch practice sessions
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('practice_sessions_esm1234567')
+        .select('date_id, is_correct')
+        .eq('user_id', user.id);
+
+      if (sessionsError) throw sessionsError;
+
+      // Calculate recall percentage for each date
+      const dateStats = {};
+      sessions.forEach(session => {
+        if (!dateStats[session.date_id]) {
+          dateStats[session.date_id] = { correct: 0, total: 0 };
+        }
+        dateStats[session.date_id].total++;
+        if (session.is_correct) {
+          dateStats[session.date_id].correct++;
+        }
+      });
+
+      const datesWithRecall = Object.keys(dateStats).map(dateId => {
+        const stats = dateStats[dateId];
+        const recallPercentage = (stats.correct / stats.total) * 100;
+        return { date_id: dateId, recall_percentage: recallPercentage };
+      });
+
+      // Sort by recall percentage ascending
+      datesWithRecall.sort((a, b) => a.recall_percentage - b.recall_percentage);
+
+      const worstPerformingDateIds = datesWithRecall.slice(0, limit).map(d => d.date_id);
+
+      if (worstPerformingDateIds.length === 0) {
+        return [];
+      }
+
+      const { data: dates, error: datesError } = await supabase
+        .from('dates_esm1234567')
+        .select('*')
+        .in('id', worstPerformingDateIds)
+        .eq('user_id', user.id);
+
+      if (datesError) throw datesError;
+
+      return dates.map(date => {
+        const stats = datesWithRecall.find(d => d.date_id === date.id);
+        return {
+          ...date,
+          name: date.event_name,
+          type: date.event_type.toLowerCase(),
+          recall_percentage: stats ? stats.recall_percentage : null
+        };
+      });
+    } catch (error) {
+      console.error('Error getting needs practice memories:', error);
+      return [];
+    }
+  };
+
   // Helper function for displaying memory names
   const getDisplayName = (memory) => {
-    return memory.memory_type === 'birthday' 
-      ? `${memory.title}'s Birthday` 
-      : memory.title;
+    return memory.type === 'birthday' 
+      ? `${memory.name}'s Birthday` 
+      : memory.name;
   };
 
   // Get upcoming dates
@@ -271,9 +387,11 @@ export const MemoryProvider = ({ children }) => {
     loading,
     error,
     addMemory,
+    submitFlashcardAnswer,
     getDisplayName,
     getUpcomingDates,
     getMemoriesForQuiz,
+    getNeedsPracticeMemories,
     hasAnsweredTodaysQuestion,
     markTodaysQuestionAsAnswered,
     updateStreak

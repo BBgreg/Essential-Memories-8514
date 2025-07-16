@@ -43,9 +43,10 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
           return;
         }
-        
+
         if (session) {
           setUser(session.user);
+          
           // Get user profile data if logged in
           if (session.user) {
             const { data: profileData, error: profileError } = await supabase
@@ -53,7 +54,7 @@ export const AuthProvider = ({ children }) => {
               .select('*')
               .eq('id', session.user.id)
               .single();
-              
+
             if (!profileError && profileData) {
               setProfile(profileData);
             } else if (profileError && profileError.code !== 'PGRST116') {
@@ -88,26 +89,23 @@ export const AuthProvider = ({ children }) => {
               .select('*')
               .eq('id', session.user.id)
               .single();
-              
+
             if (!profileError && profileData) {
               setProfile(profileData);
             } else if (profileError && profileError.code === 'PGRST116') {
-              // No profile found, create one
-              const { data: newProfile, error: createError } = await supabase
-                .from('profiles')
-                .insert({ 
-                  id: session.user.id, 
-                  email: session.user.email,
-                  username: session.user.user_metadata?.display_name || null
-                })
-                .select()
-                .single();
+              // No profile found, the trigger should have created one
+              // Let's wait a bit and try again
+              setTimeout(async () => {
+                const { data: retryProfile } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', session.user.id)
+                  .single();
                 
-              if (!createError && newProfile) {
-                setProfile(newProfile);
-              } else {
-                console.error('Error creating profile:', createError);
-              }
+                if (retryProfile) {
+                  setProfile(retryProfile);
+                }
+              }, 1000);
             } else {
               console.error('Error fetching profile:', profileError);
             }
@@ -133,12 +131,12 @@ export const AuthProvider = ({ children }) => {
         email,
         password
       });
-      
+
       if (error) {
         setAuthError(error.message);
         return { user: null, error: error.message };
       }
-      
+
       return { user: data.user, error: null };
     } catch (error) {
       setAuthError(error.message);
@@ -157,12 +155,12 @@ export const AuthProvider = ({ children }) => {
           data: metadata
         }
       });
-      
+
       if (error) {
         setAuthError(error.message);
         return { user: null, error: error.message };
       }
-      
+
       return { user: data.user, error: null };
     } catch (error) {
       setAuthError(error.message);
@@ -192,12 +190,12 @@ export const AuthProvider = ({ children }) => {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/update-password`
       });
-      
+
       if (error) {
         setAuthError(error.message);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       setAuthError(error.message);
@@ -209,15 +207,13 @@ export const AuthProvider = ({ children }) => {
   const updatePassword = async (password) => {
     try {
       setAuthError(null);
-      const { error } = await supabase.auth.updateUser({
-        password
-      });
-      
+      const { error } = await supabase.auth.updateUser({ password });
+
       if (error) {
         setAuthError(error.message);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       setAuthError(error.message);

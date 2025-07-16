@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useMemory } from '../contexts/MemoryContext';
 import * as FiIcons from 'react-icons/fi';
@@ -7,7 +7,19 @@ import SafeIcon from '../common/SafeIcon';
 const { FiGift, FiHeart, FiStar, FiCalendar, FiZap, FiTrendingUp, FiAlertCircle } = FiIcons;
 
 const Statistics = () => {
-  const { memories, streaks, getDisplayName } = useMemory();
+  const { memories, streaks, getDisplayName, getNeedsPracticeMemories } = useMemory();
+  const [needsPracticeMemories, setNeedsPracticeMemories] = useState([]);
+
+  useEffect(() => {
+    const loadNeedsPractice = async () => {
+      const needsPractice = await getNeedsPracticeMemories(3);
+      setNeedsPracticeMemories(needsPractice);
+    };
+
+    if (memories.length > 0) {
+      loadNeedsPractice();
+    }
+  }, [memories, getNeedsPracticeMemories]);
 
   const getTypeIcon = (type) => {
     switch (type) {
@@ -42,6 +54,7 @@ const Statistics = () => {
         0
       );
       const accuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+
       return {
         type,
         count: typeMemories.length,
@@ -53,26 +66,7 @@ const Statistics = () => {
     }).filter(stat => stat.count > 0);
   };
 
-  // Get worst performing memories for "Needs Practice" section
-  const getNeedsPracticeMemories = () => {
-    return memories
-      .filter(memory => memory.correctCount + memory.incorrectCount > 0) // Only memories that have been practiced
-      .map(memory => {
-        const totalQuestions = memory.correctCount + memory.incorrectCount;
-        const accuracy = Math.round((memory.correctCount / totalQuestions) * 100);
-        return {
-          ...memory,
-          accuracy,
-          totalQuestions,
-          displayName: getDisplayName(memory)
-        };
-      })
-      .sort((a, b) => a.accuracy - b.accuracy) // Sort by lowest accuracy first
-      .slice(0, 3); // Take the 3 worst performing
-  };
-
   const typeStats = getTypeStats();
-  const needsPracticeMemories = getNeedsPracticeMemories();
   const totalMemories = memories.length;
   const totalCorrect = memories.reduce((sum, memory) => sum + memory.correctCount, 0);
   const totalIncorrect = memories.reduce((sum, memory) => sum + memory.incorrectCount, 0);
@@ -215,13 +209,13 @@ const Statistics = () => {
                     <SafeIcon icon={getTypeIcon(memory.type)} className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-text-primary">{memory.displayName}</p>
+                    <p className="font-semibold text-text-primary">{memory.name}</p>
                     <p className="text-sm text-text-secondary capitalize">{memory.type}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-bold text-red-600">{memory.accuracy}%</p>
-                  <p className="text-sm text-text-secondary">{memory.totalQuestions} attempts</p>
+                  <p className="text-xl font-bold text-red-600">{Math.round(memory.recall_percentage || 0)}%</p>
+                  <p className="text-sm text-text-secondary">accuracy</p>
                 </div>
               </motion.div>
             ))
@@ -231,7 +225,8 @@ const Statistics = () => {
               <p className="text-text-secondary">
                 {memories.length > 0
                   ? "No practice sessions completed yet. Start practicing to see areas for improvement!"
-                  : "Add some memories and practice with flashcards to see which ones need more attention."}
+                  : "Add some memories and practice with flashcards to see which ones need more attention."
+                }
               </p>
             </div>
           )}
