@@ -31,6 +31,9 @@ const Navbar = () => {
             <Link
               key={item.path}
               to={item.path}
+              onClick={() => {
+                console.log(`DEBUG: Navbar - Clicked on ${item.label} (${item.path})`);
+              }}
               className="flex flex-col items-center justify-center space-y-1"
             >
               <motion.div

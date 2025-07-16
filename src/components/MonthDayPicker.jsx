@@ -6,6 +6,8 @@ import SafeIcon from '../common/SafeIcon';
 const { FiChevronLeft, FiChevronRight, FiX } = FiIcons;
 
 const MonthDayPicker = ({ value, onChange, onClose }) => {
+  console.log("DEBUG: MonthDayPicker rendering with value:", value);
+  
   const [currentMonth, setCurrentMonth] = React.useState(new Date().getMonth());
 
   // Month names for display
@@ -25,49 +27,73 @@ const MonthDayPicker = ({ value, onChange, onClose }) => {
 
   // Get the first day of the month (0-6, where 0 is Sunday)
   const getFirstDayOfMonth = (month) => {
-    const date = new Date(2024, month, 1); // Use leap year for consistency
-    return date.getDay();
+    try {
+      const date = new Date(2024, month, 1); // Use leap year for consistency
+      return date.getDay();
+    } catch (error) {
+      console.error("DEBUG: MonthDayPicker - Error getting first day of month:", error);
+      return 0; // Default to Sunday if there's an error
+    }
   };
 
   // Format date as MM/DD
   const formatDate = (month, day) => {
-    const formattedMonth = String(month + 1).padStart(2, '0');
-    const formattedDay = String(day).padStart(2, '0');
-    return `${formattedMonth}/${formattedDay}`;
+    try {
+      const formattedMonth = String(month + 1).padStart(2, '0');
+      const formattedDay = String(day).padStart(2, '0');
+      return `${formattedMonth}/${formattedDay}`;
+    } catch (error) {
+      console.error("DEBUG: MonthDayPicker - Error formatting date:", error);
+      return "01/01"; // Default to January 1st if there's an error
+    }
   };
 
   // Handle date selection
   const handleDateSelect = (day) => {
-    const formattedDate = formatDate(currentMonth, day);
-    onChange(formattedDate);
-    onClose();
+    try {
+      const formattedDate = formatDate(currentMonth, day);
+      console.log("DEBUG: MonthDayPicker - Date selected:", formattedDate);
+      onChange(formattedDate);
+      onClose();
+    } catch (error) {
+      console.error("DEBUG: MonthDayPicker - Error selecting date:", error);
+    }
   };
 
   // Generate calendar grid data
   const generateCalendarDays = React.useCallback(() => {
-    const daysInMonth = getDaysInMonth(currentMonth);
-    const firstDay = getFirstDayOfMonth(currentMonth);
-    const days = [];
+    try {
+      const daysInMonth = getDaysInMonth(currentMonth);
+      const firstDay = getFirstDayOfMonth(currentMonth);
+      const days = [];
 
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
+      // Add empty cells for days before the first day of the month
+      for (let i = 0; i < firstDay; i++) {
+        days.push(null);
+      }
+
+      // Add the days of the month
+      for (let day = 1; day <= daysInMonth; day++) {
+        days.push(day);
+      }
+
+      return days;
+    } catch (error) {
+      console.error("DEBUG: MonthDayPicker - Error generating calendar days:", error);
+      return []; // Return empty array if there's an error
     }
-
-    // Add the days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(day);
-    }
-
-    return days;
   }, [currentMonth]);
 
   // Parse current value to highlight selected date
   const parseSelectedDate = () => {
-    if (!value) return null;
-    
-    const [month, day] = value.split('/').map(Number);
-    return { month: month - 1, day };
+    try {
+      if (!value) return null;
+      const [month, day] = value.split('/').map(Number);
+      return { month: month - 1, day };
+    } catch (error) {
+      console.error("DEBUG: MonthDayPicker - Error parsing selected date:", error);
+      return null;
+    }
   };
 
   const selected = parseSelectedDate();
@@ -79,12 +105,20 @@ const MonthDayPicker = ({ value, onChange, onClose }) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={(e) => {
+        // Close when clicking backdrop
+        if (e.target === e.currentTarget) {
+          console.log("DEBUG: MonthDayPicker - Backdrop clicked, closing picker");
+          onClose();
+        }
+      }}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full"
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -135,9 +169,10 @@ const MonthDayPicker = ({ value, onChange, onClose }) => {
                   onClick={() => handleDateSelect(day)}
                   className={`
                     aspect-square p-2 rounded-full text-center relative
-                    ${isSelected 
-                      ? 'bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white' 
-                      : 'hover:bg-gray-100'}
+                    ${isSelected
+                      ? 'bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white'
+                      : 'hover:bg-gray-100'
+                    }
                   `}
                 >
                   {day}
@@ -151,7 +186,10 @@ const MonthDayPicker = ({ value, onChange, onClose }) => {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={onClose}
+          onClick={() => {
+            console.log("DEBUG: MonthDayPicker - Cancel button clicked");
+            onClose();
+          }}
           className="w-full bg-gray-100 text-text-primary py-3 rounded-xl font-medium"
         >
           Cancel

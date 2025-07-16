@@ -7,18 +7,20 @@ import MonthDayPicker from './MonthDayPicker';
 const { FiCalendar } = FiIcons;
 
 const DateField = ({ value, onChange, label }) => {
+  console.log("DEBUG: DateField component rendering with value:", value);
+  
   const [showPicker, setShowPicker] = React.useState(false);
 
   const handleIconClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log("DEBUG: DateField - Calendar icon clicked, showing picker");
     setShowPicker(true);
   };
 
   // Format for display
   const formatDisplayValue = (value) => {
     if (!value) return '';
-    
     // Value is already in MM/DD format
     return value;
   };
@@ -40,7 +42,6 @@ const DateField = ({ value, onChange, label }) => {
             cursor-default
           `}
         />
-        
         {/* Calendar icon button */}
         <motion.button
           whileHover={{ scale: 1.1 }}
@@ -57,8 +58,14 @@ const DateField = ({ value, onChange, label }) => {
         {showPicker && (
           <MonthDayPicker
             value={value}
-            onChange={onChange}
-            onClose={() => setShowPicker(false)}
+            onChange={(newDate) => {
+              console.log("DEBUG: DateField - Date selected:", newDate);
+              onChange(newDate);
+            }}
+            onClose={() => {
+              console.log("DEBUG: DateField - Picker closed");
+              setShowPicker(false);
+            }}
           />
         )}
       </AnimatePresence>
