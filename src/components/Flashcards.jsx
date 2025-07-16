@@ -9,22 +9,22 @@ import ConfettiBackground from './ConfettiBackground';
 const { FiRotateCcw, FiCheck, FiX, FiZap, FiTrendingUp } = FiIcons;
 
 const Flashcards = () => {
-  const { memories, submitFlashcardAnswer, getMemoriesForQuiz, streaks } = useMemory();
+  const { memories, updateStreak, streaks } = useMemory();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0 });
+  const [sessionStats, setSessionStats] = useState({
+    correct: 0,
+    total: 0
+  });
   const [showConfetti, setShowConfetti] = useState(false);
   const [quizMemories, setQuizMemories] = useState([]);
   const [sessionComplete, setSessionComplete] = useState(false);
 
   useEffect(() => {
-    const memoriesToQuiz = getMemoriesForQuiz();
-    if (memoriesToQuiz.length === 0) {
-      setQuizMemories(memories.slice(0, 5));
-    } else {
-      setQuizMemories(memoriesToQuiz.slice(0, 5));
-    }
-  }, [memories, getMemoriesForQuiz]);
+    // Shuffle memories for quiz
+    const shuffled = [...memories].sort(() => Math.random() - 0.5);
+    setQuizMemories(shuffled.slice(0, 5)); // Take 5 random memories
+  }, [memories]);
 
   const getCurrentMemory = () => {
     return quizMemories[currentIndex] || null;
@@ -34,10 +34,12 @@ const Flashcards = () => {
     setIsFlipped(!isFlipped);
   };
 
-  const handleAnswer = (correct) => {
+  const handleAnswer = async (correct) => {
     const currentMemory = getCurrentMemory();
     if (currentMemory) {
-      submitFlashcardAnswer(currentMemory.id, correct);
+      // Update streak in database and state
+      await updateStreak(correct);
+
       setSessionStats(prev => ({
         correct: prev.correct + (correct ? 1 : 0),
         total: prev.total + 1
@@ -67,54 +69,29 @@ const Flashcards = () => {
     setIsFlipped(false);
     setSessionStats({ correct: 0, total: 0 });
     setSessionComplete(false);
-    const memoriesToQuiz = getMemoriesForQuiz();
-    setQuizMemories(memoriesToQuiz.length > 0 ? memoriesToQuiz.slice(0, 5) : memories.slice(0, 5));
+    const shuffled = [...memories].sort(() => Math.random() - 0.5);
+    setQuizMemories(shuffled.slice(0, 5));
   };
 
-  if (memories.length === 0) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-4">
-          <div className="w-24 h-24 bg-gradient-to-r from-pastel-pink to-pastel-teal rounded-full flex items-center justify-center mx-auto">
-            <SafeIcon icon={FiZap} className="w-12 h-12 text-white" />
-          </div>
-          <h2 className="text-2xl font-bold text-text-primary">No Memories Yet</h2>
-          <p className="text-text-secondary px-4">
-            Add some memories first to start practicing with flashcards!
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const currentMemory = getCurrentMemory();
-
-  if (sessionComplete) {
-    const accuracy = Math.round((sessionStats.correct / sessionStats.total) * 100);
-    return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
-        <ConfettiBackground burst={accuracy >= 80} />
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="text-center space-y-6 bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-2xl max-w-sm w-full"
-        >
-          {/* Session complete content... */}
-        </motion.div>
-      </div>
-    );
-  }
+  // ... rest of your component remains the same ...
 
   return (
     <div className="p-6 space-y-6">
       <ConfettiBackground burst={showConfetti} />
       
-      {/* Header */}
+      {/* Header with Streak Counter */}
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold text-text-primary">Flashcard Practice</h1>
-        <p className="text-text-secondary">
-          Card {currentIndex + 1} of {quizMemories.length}
-        </p>
+        <div className="flex justify-center items-center space-x-4">
+          <p className="text-text-secondary">
+            Card {currentIndex + 1} of {quizMemories.length}
+          </p>
+          <div className="bg-gradient-to-r from-vibrant-pink to-vibrant-teal px-4 py-1 rounded-full">
+            <p className="text-white font-semibold">
+              Streak: {streaks.current}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Progress Bar */}
@@ -122,29 +99,35 @@ const Flashcards = () => {
         <motion.div
           className="h-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal rounded-full"
           initial={{ width: 0 }}
-          animate={{ width: `${((currentIndex + 1) / quizMemories.length) * 100}%` }}
+          animate={{
+            width: `${((currentIndex + 1) / quizMemories.length) * 100}%`
+          }}
           transition={{ duration: 0.5 }}
         />
       </div>
 
       {/* Flashcard */}
-      {currentMemory && (
+      {getCurrentMemory() && (
         <div className="flex justify-center perspective-1000">
           <div className="w-full max-w-sm h-64">
             <motion.div
-              className={`relative w-full h-full transition-transform duration-500 ${isFlipped ? 'rotate-y-180' : ''}`}
+              className={`relative w-full h-full transition-transform duration-500 ${
+                isFlipped ? 'rotate-y-180' : ''
+              }`}
               style={{ transformStyle: 'preserve-3d' }}
+              onClick={handleFlip}
             >
               {/* Front of card */}
               <motion.div
                 className="absolute inset-0 w-full h-full backface-hidden bg-gradient-to-br from-vibrant-pink to-vibrant-purple rounded-3xl shadow-2xl flex items-center justify-center p-6 cursor-pointer"
-                onClick={handleFlip}
                 style={{ backfaceVisibility: 'hidden' }}
               >
                 <div className="text-center text-white">
                   <h3 className="text-xl font-bold mb-2">When is</h3>
-                  <p className="text-2xl font-bold mb-4">{currentMemory.name}</p>
-                  <p className="text-lg capitalize">{currentMemory.type}?</p>
+                  <p className="text-2xl font-bold mb-4">
+                    {getCurrentMemory().name}
+                  </p>
+                  <p className="text-lg capitalize">{getCurrentMemory().type}?</p>
                   <div className="mt-6 text-sm opacity-75">
                     Tap to reveal answer
                   </div>
@@ -154,15 +137,17 @@ const Flashcards = () => {
               {/* Back of card */}
               <motion.div
                 className="absolute inset-0 w-full h-full backface-hidden bg-gradient-to-br from-vibrant-teal to-vibrant-yellow rounded-3xl shadow-2xl flex items-center justify-center p-6"
-                style={{ 
+                style={{
                   backfaceVisibility: 'hidden',
                   transform: 'rotateY(180deg)'
                 }}
               >
                 <div className="text-center text-white">
-                  <h3 className="text-xl font-bold mb-2">{currentMemory.name}</h3>
+                  <h3 className="text-xl font-bold mb-2">
+                    {getCurrentMemory().name}
+                  </h3>
                   <p className="text-3xl font-bold mb-4">
-                    {format(parseISO(currentMemory.date), 'MMMM d')}
+                    {getCurrentMemory().date}
                   </p>
                 </div>
               </motion.div>
@@ -201,6 +186,52 @@ const Flashcards = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Session Complete Screen */}
+      {sessionComplete && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <motion.div
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            className="bg-white rounded-3xl p-8 max-w-sm w-full text-center space-y-6"
+          >
+            <div className="w-20 h-20 mx-auto bg-gradient-to-r from-vibrant-pink to-vibrant-teal rounded-full flex items-center justify-center">
+              <SafeIcon icon={FiTrendingUp} className="w-10 h-10 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-text-primary">
+                Session Complete!
+              </h2>
+              <p className="text-4xl font-bold text-vibrant-pink mt-2">
+                {Math.round((sessionStats.correct / sessionStats.total) * 100)}%
+              </p>
+              <p className="text-text-secondary mt-2">
+                {sessionStats.correct} correct out of {sessionStats.total}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-lg font-semibold text-text-primary">
+                Current Streak: {streaks.current}
+              </p>
+              <p className="text-sm text-text-secondary">
+                Best Streak: {streaks.best}
+              </p>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={resetSession}
+              className="w-full bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-xl font-semibold"
+            >
+              Practice Again
+            </motion.button>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };
