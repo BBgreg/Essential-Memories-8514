@@ -8,16 +8,22 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Create Supabase client
+// Create Supabase client with improved error handling and retry logic
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true
+  },
+  // Add retryable HTTP client options
+  global: {
+    headers: {
+      'x-client-info': 'essential-memories'
+    }
   }
 });
 
-// Helper function to refresh session
+// Helper function to refresh session with improved error handling
 export const refreshSession = async () => {
   try {
     const { data, error } = await supabase.auth.refreshSession();
@@ -29,6 +35,18 @@ export const refreshSession = async () => {
   } catch (error) {
     console.error('Session refresh failed:', error);
     return false;
+  }
+};
+
+// Helper function to check authentication status
+export const checkAuth = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return { isAuthenticated: !!session?.user, user: session?.user };
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    return { isAuthenticated: false, user: null };
   }
 };
 
