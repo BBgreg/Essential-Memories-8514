@@ -1,7 +1,7 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { MemoryProvider } from './contexts/MemoryContext';
+import { MemoryProvider } from './contexts/MemoryContext'; // Updated import
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -44,7 +44,7 @@ function App() {
               <Routes>
                 {/* Root redirect */}
                 <Route path="/" element={<Navigate to="/login" replace />} />
-
+                
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
@@ -52,7 +52,7 @@ function App() {
                 <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
-
+                
                 {/* Protected routes */}
                 <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                 <Route path="/add" element={<ProtectedRoute><AddMemory /></ProtectedRoute>} />
@@ -60,7 +60,7 @@ function App() {
                 <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
                 <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-
+                
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/login" replace />} />
               </Routes>
