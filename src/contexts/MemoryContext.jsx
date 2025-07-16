@@ -160,45 +160,69 @@ export const MemoryProvider = ({ children }) => {
     if (!user) return;
 
     try {
-      console.log('DEBUG: Updating flashcard streak, isCorrect:', isCorrect);
+      console.group('🎯 Flashcard Streak Update');
+      console.log('Starting streak update - isCorrect:', isCorrect);
       
-      const { currentStreak, bestStreak } = await fetchUserStreaks();
-      console.log('DEBUG: Current streak data:', { currentStreak, bestStreak });
-
-      let newCurrentStreak = currentStreak;
-      let newBestStreak = bestStreak;
-
-      if (isCorrect) {
-        newCurrentStreak += 1;
-        if (newCurrentStreak > newBestStreak) {
-          newBestStreak = newCurrentStreak;
-        }
-        console.log('DEBUG: Correct answer - new streaks:', { newCurrentStreak, newBestStreak });
-      } else {
-        newCurrentStreak = 0; // Reset streak on incorrect answer
-        console.log('DEBUG: Incorrect answer - resetting current streak to 0');
-      }
-
-      const today = new Date().toISOString().split('T')[0];
-
-      // Update Supabase with both old and new column names for compatibility
-      const { data, error } = await supabase
+      // Get current streaks with detailed logging
+      const { data: currentData, error: fetchError } = await supabase
         .from('streak_data')
-        .upsert({
-          user_id: user.id,
-          flashcard_current_streak: newCurrentStreak,
-          flashcard_streak: newCurrentStreak, // Keep for backward compatibility
-          best_flashcard_streak: newBestStreak,
-          flashcard_all_time_high: newBestStreak, // Keep for backward compatibility
-          last_flashcard_date: today
-        }, { onConflict: 'user_id' });
-
-      if (error) {
-        console.error('Error updating flashcard streak:', error);
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      
+      console.log('Current DB State:', currentData);
+      
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching current streak:', fetchError);
+        console.groupEnd();
         return;
       }
 
-      console.log('DEBUG: Streak updated successfully in database');
+      // Calculate new streak values
+      let newCurrentStreak = (currentData?.flashcard_current_streak || 0);
+      let newBestStreak = (currentData?.best_flashcard_streak || 0);
+
+      if (isCorrect) {
+        newCurrentStreak += 1;
+        console.log('Incrementing streak from', currentData?.flashcard_current_streak, 'to', newCurrentStreak);
+        
+        if (newCurrentStreak > newBestStreak) {
+          newBestStreak = newCurrentStreak;
+          console.log('New best streak achieved:', newBestStreak);
+        }
+      } else {
+        console.log('Incorrect answer - resetting streak to 0');
+        newCurrentStreak = 0;
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Prepare update payload
+      const updatePayload = {
+        user_id: user.id,
+        flashcard_current_streak: newCurrentStreak,
+        flashcard_streak: newCurrentStreak,
+        best_flashcard_streak: newBestStreak,
+        flashcard_all_time_high: newBestStreak,
+        last_flashcard_date: today
+      };
+      
+      console.log('Update payload:', updatePayload);
+
+      // Perform update with upsert
+      const { data: updateResult, error: updateError } = await supabase
+        .from('streak_data')
+        .upsert(updatePayload)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating streak:', updateError);
+        console.groupEnd();
+        return;
+      }
+
+      console.log('Streak update successful:', updateResult);
 
       // Update local state
       setStreaks(prev => ({
@@ -209,10 +233,12 @@ export const MemoryProvider = ({ children }) => {
         }
       }));
 
-      console.log('DEBUG: Local state updated');
+      console.log('Local state updated');
+      console.groupEnd();
 
     } catch (error) {
-      console.error('Error in updateFlashcardStreak:', error);
+      console.error('Unexpected error in updateFlashcardStreak:', error);
+      console.groupEnd();
     }
   };
 

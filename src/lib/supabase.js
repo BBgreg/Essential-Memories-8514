@@ -4,7 +4,7 @@ const supabaseUrl = process.env.SUPABASE_URL || 'https://dnxvucdnduwlfwzrfwoh.su
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRueHZ1Y2RuZHV3bGZ3enJmd29oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2MDgzMjUsImV4cCI6MjA2ODE4NDMyNX0.nYAkn11h9mkDuxxdd82JBHYdNWfoS_qwWu-PhKzjt5A';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+  throw new Error('Missing Supabase variables');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -14,6 +14,30 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true
   }
 });
+
+// Enhanced debugging for streak updates
+export const debugStreakUpdate = async (userId, isCorrect, currentStreak, newStreak) => {
+  console.group('🎯 Streak Update Debug');
+  console.log('User ID:', userId);
+  console.log('Correct Answer:', isCorrect);
+  console.log('Current Streak:', currentStreak);
+  console.log('New Streak:', newStreak);
+  
+  try {
+    const { data, error } = await supabase
+      .from('streak_data')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+      
+    console.log('Current DB State:', data);
+    if (error) console.error('DB Read Error:', error);
+  } catch (err) {
+    console.error('Debug Query Error:', err);
+  }
+  
+  console.groupEnd();
+};
 
 // Helper function to refresh session
 export const refreshSession = async () => {
