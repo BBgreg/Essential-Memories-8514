@@ -15,30 +15,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Enhanced debugging for streak updates
-export const debugStreakUpdate = async (userId, isCorrect, currentStreak, newStreak) => {
-  console.group('🎯 Streak Update Debug');
-  console.log('User ID:', userId);
-  console.log('Correct Answer:', isCorrect);
-  console.log('Current Streak:', currentStreak);
-  console.log('New Streak:', newStreak);
-  
-  try {
-    const { data, error } = await supabase
-      .from('streak_data')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-      
-    console.log('Current DB State:', data);
-    if (error) console.error('DB Read Error:', error);
-  } catch (err) {
-    console.error('Debug Query Error:', err);
-  }
-  
-  console.groupEnd();
-};
-
 // Helper function to refresh session
 export const refreshSession = async () => {
   try {

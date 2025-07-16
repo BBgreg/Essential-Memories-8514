@@ -14,10 +14,7 @@ export const useMemory = () => {
 
 export const MemoryProvider = ({ children }) => {
   const { user } = useAuth();
-  const [streaks, setStreaks] = useState({
-    current: 0,
-    best: 0
-  });
+  const [streaks, setStreaks] = useState({ current: 0, best: 0 });
 
   // Fetch streaks when user logs in
   useEffect(() => {
@@ -46,11 +43,7 @@ export const MemoryProvider = ({ children }) => {
         await supabase
           .from('user_streaks')
           .insert([
-            {
-              user_id: user.id,
-              current_streak: 0,
-              best_streak: 0
-            }
+            { user_id: user.id, current_streak: 0, best_streak: 0 }
           ]);
       }
     } catch (error) {
@@ -79,7 +72,10 @@ export const MemoryProvider = ({ children }) => {
         best: newBestStreak
       });
 
-      return { current: newCurrentStreak, best: newBestStreak };
+      return {
+        current: newCurrentStreak,
+        best: newBestStreak
+      };
     } catch (error) {
       console.error('Error updating streak:', error);
       return streaks;
