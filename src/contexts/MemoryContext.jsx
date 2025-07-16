@@ -110,18 +110,109 @@ export const MemoryProvider = ({ children }) => {
             lastDate: data.last_qod_date
           },
           flashcard: {
-            current: data.flashcard_current_streak || 0,
-            best: data.flashcard_all_time_high || data.flashcard_streak || 0
+            current: data.flashcard_current_streak || data.flashcard_streak || 0,
+            best: data.best_flashcard_streak || data.flashcard_all_time_high || data.flashcard_streak || 0
           }
-        });
-        
-        console.log('DEBUG: Loaded streaks from DB:', {
-          flashcardCurrent: data.flashcard_current_streak || 0,
-          flashcardBest: data.flashcard_all_time_high || data.flashcard_streak || 0
         });
       }
     } catch (error) {
       console.error('Error in loadStreaks:', error);
+    }
+  };
+
+  const fetchUserStreaks = async () => {
+    if (!user) return { currentStreak: 0, bestStreak: 0 };
+
+    try {
+      const { data, error } = await supabase
+        .from('streak_data')
+        .select('flashcard_current_streak, flashcard_streak, best_flashcard_streak, flashcard_all_time_high')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // No rows found - create initial streak record
+        await supabase.from('streak_data').insert({
+          user_id: user.id,
+          flashcard_current_streak: 0,
+          flashcard_streak: 0,
+          best_flashcard_streak: 0,
+          flashcard_all_time_high: 0,
+          last_flashcard_date: null
+        });
+        return { currentStreak: 0, bestStreak: 0 };
+      } else if (error) {
+        console.error('Error fetching streak data:', error);
+        return { currentStreak: 0, bestStreak: 0 };
+      }
+
+      return {
+        currentStreak: data.flashcard_current_streak || data.flashcard_streak || 0,
+        bestStreak: data.best_flashcard_streak || data.flashcard_all_time_high || 0
+      };
+    } catch (error) {
+      console.error('Error in fetchUserStreaks:', error);
+      return { currentStreak: 0, bestStreak: 0 };
+    }
+  };
+
+  const updateFlashcardStreak = async (isCorrect) => {
+    if (!user) return;
+
+    try {
+      console.log('DEBUG: Updating flashcard streak, isCorrect:', isCorrect);
+      
+      const { currentStreak, bestStreak } = await fetchUserStreaks();
+      console.log('DEBUG: Current streak data:', { currentStreak, bestStreak });
+
+      let newCurrentStreak = currentStreak;
+      let newBestStreak = bestStreak;
+
+      if (isCorrect) {
+        newCurrentStreak += 1;
+        if (newCurrentStreak > newBestStreak) {
+          newBestStreak = newCurrentStreak;
+        }
+        console.log('DEBUG: Correct answer - new streaks:', { newCurrentStreak, newBestStreak });
+      } else {
+        newCurrentStreak = 0; // Reset streak on incorrect answer
+        console.log('DEBUG: Incorrect answer - resetting current streak to 0');
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+
+      // Update Supabase with both old and new column names for compatibility
+      const { data, error } = await supabase
+        .from('streak_data')
+        .upsert({
+          user_id: user.id,
+          flashcard_current_streak: newCurrentStreak,
+          flashcard_streak: newCurrentStreak, // Keep for backward compatibility
+          best_flashcard_streak: newBestStreak,
+          flashcard_all_time_high: newBestStreak, // Keep for backward compatibility
+          last_flashcard_date: today
+        }, { onConflict: 'user_id' });
+
+      if (error) {
+        console.error('Error updating flashcard streak:', error);
+        return;
+      }
+
+      console.log('DEBUG: Streak updated successfully in database');
+
+      // Update local state
+      setStreaks(prev => ({
+        ...prev,
+        flashcard: {
+          current: newCurrentStreak,
+          best: newBestStreak
+        }
+      }));
+
+      console.log('DEBUG: Local state updated');
+
+    } catch (error) {
+      console.error('Error in updateFlashcardStreak:', error);
     }
   };
 
@@ -214,13 +305,14 @@ export const MemoryProvider = ({ children }) => {
       }
 
       // Update local state
-      setMemories(prev => prev.map(memory => memory.id === memoryId ? {
-        ...memory,
-        name: data.name,
-        date: `${String(data.month).padStart(2, '0')}/${String(data.day).padStart(2, '0')}`,
-        type: data.category,
-        notes: data.notes
-      } : memory
+      setMemories(prev => prev.map(memory => 
+        memory.id === memoryId ? {
+          ...memory,
+          name: data.name,
+          date: `${String(data.month).padStart(2, '0')}/${String(data.day).padStart(2, '0')}`,
+          type: data.category,
+          notes: data.notes
+        } : memory
       ));
 
       return data;
@@ -285,167 +377,19 @@ export const MemoryProvider = ({ children }) => {
       }
 
       // Update local memory state
-      setMemories(prev => prev.map(memory => memory.id === memoryId ? {
-        ...memory,
-        correctCount: correct ? memory.correctCount + 1 : memory.correctCount,
-        incorrectCount: correct ? memory.incorrectCount : memory.incorrectCount + 1
-      } : memory
+      setMemories(prev => prev.map(memory => 
+        memory.id === memoryId ? {
+          ...memory,
+          correctCount: correct ? memory.correctCount + 1 : memory.correctCount,
+          incorrectCount: correct ? memory.incorrectCount : memory.incorrectCount + 1
+        } : memory
       ));
 
-      // Update streak if correct
-      if (correct) {
-        await updateFlashcardStreak();
-      } else {
-        // Reset streak on incorrect answer
-        await resetFlashcardStreak();
-        console.log("DEBUG: Flashcard - Incorrect answer. Resetting current streak to 0.");
-      }
+      // Update flashcard streak
+      await updateFlashcardStreak(correct);
+
     } catch (error) {
       console.error('Error in submitFlashcardAnswer:', error);
-    }
-  };
-
-  const updateFlashcardStreak = async () => {
-    if (!user) return;
-
-    try {
-      console.log("DEBUG: Flashcard - Fetching initial streaks for user:", user.id);
-      
-      // Get current streak data including the last practice date
-      const { data, error } = await supabase
-        .from('streak_data')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching streak data:', error);
-        return;
-      }
-
-      const today = new Date().toISOString().split('T')[0];
-      let currentStreak = 1;
-      let bestStreak = data?.flashcard_all_time_high || 0;
-      
-      // If we have existing streak data
-      if (data) {
-        const lastDate = data.last_flashcard_date;
-        
-        // Calculate days difference
-        if (lastDate) {
-          const lastPracticeDate = new Date(lastDate);
-          const todayDate = new Date(today);
-          const daysDiff = Math.floor((todayDate - lastPracticeDate) / (1000 * 60 * 60 * 24));
-          
-          console.log("DEBUG: Flashcard - Days since last practice:", daysDiff);
-
-          // If practiced today or yesterday, continue streak
-          if (daysDiff === 0 || daysDiff === 1) {
-            currentStreak = (data.flashcard_current_streak || 0) + 1;
-            console.log("DEBUG: Flashcard - Continuing streak. New value:", currentStreak);
-          } else {
-            console.log("DEBUG: Flashcard - Break in streak detected. Days elapsed:", daysDiff);
-            currentStreak = 1; // Start new streak
-          }
-        }
-
-        // Update best streak if current is higher
-        if (currentStreak > bestStreak) {
-          bestStreak = currentStreak;
-          console.log("DEBUG: Flashcard - New best streak achieved:", bestStreak);
-        }
-      }
-
-      console.log("DEBUG: Flashcard - Preparing to persist streaks. Current:", currentStreak, "Best:", bestStreak);
-
-      // Update streak data in Supabase
-      const { error: updateError } = await supabase
-        .from('streak_data')
-        .upsert({
-          user_id: user.id,
-          flashcard_current_streak: currentStreak,
-          flashcard_all_time_high: bestStreak,
-          last_flashcard_date: today
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (updateError) {
-        console.error('Error updating flashcard streak:', updateError);
-        return;
-      }
-
-      console.log("DEBUG: Flashcard - Successfully persisted streaks to DB:", {
-        currentStreak,
-        bestStreak,
-        lastDate: today
-      });
-
-      // Update local state
-      setStreaks(prev => ({
-        ...prev,
-        flashcard: {
-          current: currentStreak,
-          best: bestStreak
-        }
-      }));
-    } catch (error) {
-      console.error('Error in updateFlashcardStreak:', error);
-    }
-  };
-
-  const resetFlashcardStreak = async () => {
-    if (!user) return;
-
-    try {
-      console.log("DEBUG: Flashcard - Resetting streak due to incorrect answer");
-      
-      // Get current streak data for best streak
-      const { data, error } = await supabase
-        .from('streak_data')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching streak data:', error);
-        return;
-      }
-
-      const today = new Date().toISOString().split('T')[0];
-      const bestStreak = data?.flashcard_all_time_high || 0;
-
-      console.log("DEBUG: Flashcard - Resetting current streak to 0. Best streak remains:", bestStreak);
-
-      // Reset current streak to 0
-      const { error: updateError } = await supabase
-        .from('streak_data')
-        .upsert({
-          user_id: user.id,
-          flashcard_current_streak: 0,
-          flashcard_all_time_high: bestStreak,
-          last_flashcard_date: today
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (updateError) {
-        console.error('Error resetting flashcard streak:', updateError);
-        return;
-      }
-
-      console.log("DEBUG: Flashcard - Successfully reset streak in DB");
-
-      // Update local state
-      setStreaks(prev => ({
-        ...prev,
-        flashcard: {
-          current: 0,
-          best: bestStreak
-        }
-      }));
-    } catch (error) {
-      console.error('Error in resetFlashcardStreak:', error);
     }
   };
 
@@ -496,7 +440,7 @@ export const MemoryProvider = ({ children }) => {
           question_of_day_streak: newStreak,
           question_of_day_best_streak: bestStreak,
           last_qod_date: today
-        });
+        }, { onConflict: 'user_id' });
 
       if (updateError) {
         console.error('Error updating question of day streak:', updateError);
@@ -511,6 +455,7 @@ export const MemoryProvider = ({ children }) => {
           lastDate: today
         }
       }));
+
     } catch (error) {
       console.error('Error in markTodaysQuestionAsAnswered:', error);
     }
