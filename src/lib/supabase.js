@@ -1,13 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://dnxvucdnduwlfwzrfwoh.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRueHZ1Y2RuZHV3bGZ3enJmd29oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2MDgzMjUsImV4cCI6MjA2ODE4NDMyNX0.nYAkn11h9mkDuxxdd82JBHYdNWfoS_qwWu-PhKzjt5A';
+// Project details from Supabase
+const SUPABASE_URL = 'https://lbuicopybuzhbhnrrzgw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidWljb3B5YnV6aGJobnJyemd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2NDQ5NzEsImV4cCI6MjA2ODIyMDk3MX0.XeW54xnsdQitaRlT23gLjLEar1VOEKmyzzDtY4U5fOc';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase variables');
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create Supabase client
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
