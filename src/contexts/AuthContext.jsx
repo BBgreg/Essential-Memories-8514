@@ -12,7 +12,7 @@ const AuthContext = createContext({
   signOut: async () => {},
   resetPassword: async () => {},
   updatePassword: async () => {},
-  updateProfile: async () => {}
+  updateProfile: async () => {},
 });
 
 export const useAuth = () => {
@@ -33,6 +33,72 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
   };
 
+  // Initialize user data after successful authentication
+  const initializeUserData = async (userId) => {
+    try {
+      console.log('Initializing user data for:', userId);
+      
+      // Try to fetch existing profile
+      let { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError && profileError.code === 'PGRST116') {
+        // Profile doesn't exist, create it
+        console.log('Creating new profile for user:', userId);
+        const { data: user } = await supabase.auth.getUser();
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: user.user.email,
+            display_name: user.user.user_metadata?.display_name || ''
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          throw insertError;
+        }
+        profileData = newProfile;
+      } else if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        throw profileError;
+      }
+
+      // Initialize streak data if it doesn't exist
+      const { data: streakData, error: streakError } = await supabase
+        .from('streak_data')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (streakError && streakError.code === 'PGRST116') {
+        console.log('Creating initial streak data for user:', userId);
+        await supabase
+          .from('streak_data')
+          .insert({
+            user_id: userId,
+            current_streak: 0,
+            best_streak: 0
+          });
+      } else if (streakError) {
+        console.error('Error fetching streak data:', streakError);
+        throw streakError;
+      }
+
+      setProfile(profileData);
+      return true;
+    } catch (error) {
+      console.error('Error initializing user data:', error);
+      setAuthError('Failed to initialize user data. Please try again.');
+      return false;
+    }
+  };
+
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
@@ -44,7 +110,7 @@ export const AuthProvider = ({ children }) => {
           setAuthError(error.message);
         } else if (session?.user) {
           setUser(session.user);
-          await fetchUserProfile(session.user.id);
+          await initializeUserData(session.user.id);
         }
       } catch (error) {
         console.error('Session initialization error:', error);
@@ -63,12 +129,11 @@ export const AuthProvider = ({ children }) => {
         
         if (session?.user) {
           setUser(session.user);
-          await fetchUserProfile(session.user.id);
+          await initializeUserData(session.user.id);
         } else {
           setUser(null);
           setProfile(null);
         }
-        
         setLoading(false);
       }
     );
@@ -77,25 +142,6 @@ export const AuthProvider = ({ children }) => {
       subscription.unsubscribe();
     };
   }, []);
-
-  const fetchUserProfile = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-
-      setProfile(data);
-    } catch (error) {
-      console.error('Profile fetch error:', error);
-    }
-  };
 
   const signUp = async (email, password, metadata = {}) => {
     try {
@@ -156,12 +202,10 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
-      
       if (error) {
         setAuthError(error.message);
         return false;
       }
-
       setUser(null);
       setProfile(null);
       return true;
@@ -177,16 +221,13 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = async (email) => {
     try {
       setAuthError(null);
-      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/update-password`
       });
-
       if (error) {
         setAuthError(error.message);
         return false;
       }
-
       return true;
     } catch (error) {
       console.error('Password reset error:', error);
@@ -198,16 +239,11 @@ export const AuthProvider = ({ children }) => {
   const updatePassword = async (password) => {
     try {
       setAuthError(null);
-      
-      const { error } = await supabase.auth.updateUser({
-        password
-      });
-
+      const { error } = await supabase.auth.updateUser({ password });
       if (error) {
         setAuthError(error.message);
         return false;
       }
-
       return true;
     } catch (error) {
       console.error('Password update error:', error);
@@ -219,7 +255,6 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (updates) => {
     try {
       setAuthError(null);
-      
       if (!user) {
         setAuthError('No user logged in');
         return null;
@@ -257,10 +292,14 @@ export const AuthProvider = ({ children }) => {
     signOut,
     resetPassword,
     updatePassword,
-    updateProfile
+    updateProfile,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export default AuthProvider;
