@@ -311,7 +311,7 @@ export const MemoryProvider = ({ children }) => {
     try {
       console.log("DEBUG: Flashcard - Fetching initial streaks for user:", user.id);
       
-      // Get current streak data
+      // Get current streak data including the last practice date
       const { data, error } = await supabase
         .from('streak_data')
         .select('*')
@@ -325,14 +325,28 @@ export const MemoryProvider = ({ children }) => {
 
       const today = new Date().toISOString().split('T')[0];
       let currentStreak = 1;
-      let bestStreak = data?.flashcard_all_time_high || data?.flashcard_streak || 0;
-
+      let bestStreak = data?.flashcard_all_time_high || 0;
+      
       // If we have existing streak data
       if (data) {
-        // Check if there's a current streak to continue
-        if (data.flashcard_current_streak) {
-          currentStreak = (data.flashcard_current_streak || 0) + 1;
-          console.log("DEBUG: Flashcard - Correct answer. Incrementing current streak to:", currentStreak);
+        const lastDate = data.last_flashcard_date;
+        
+        // Calculate days difference
+        if (lastDate) {
+          const lastPracticeDate = new Date(lastDate);
+          const todayDate = new Date(today);
+          const daysDiff = Math.floor((todayDate - lastPracticeDate) / (1000 * 60 * 60 * 24));
+          
+          console.log("DEBUG: Flashcard - Days since last practice:", daysDiff);
+
+          // If practiced today or yesterday, continue streak
+          if (daysDiff === 0 || daysDiff === 1) {
+            currentStreak = (data.flashcard_current_streak || 0) + 1;
+            console.log("DEBUG: Flashcard - Continuing streak. New value:", currentStreak);
+          } else {
+            console.log("DEBUG: Flashcard - Break in streak detected. Days elapsed:", daysDiff);
+            currentStreak = 1; // Start new streak
+          }
         }
 
         // Update best streak if current is higher
@@ -342,6 +356,8 @@ export const MemoryProvider = ({ children }) => {
         }
       }
 
+      console.log("DEBUG: Flashcard - Preparing to persist streaks. Current:", currentStreak, "Best:", bestStreak);
+
       // Update streak data in Supabase
       const { error: updateError } = await supabase
         .from('streak_data')
@@ -350,6 +366,8 @@ export const MemoryProvider = ({ children }) => {
           flashcard_current_streak: currentStreak,
           flashcard_all_time_high: bestStreak,
           last_flashcard_date: today
+        }, {
+          onConflict: 'user_id'
         });
 
       if (updateError) {
@@ -357,7 +375,11 @@ export const MemoryProvider = ({ children }) => {
         return;
       }
 
-      console.log("DEBUG: Flashcard - Persisting streaks to DB: Current", currentStreak, "Best", bestStreak);
+      console.log("DEBUG: Flashcard - Successfully persisted streaks to DB:", {
+        currentStreak,
+        bestStreak,
+        lastDate: today
+      });
 
       // Update local state
       setStreaks(prev => ({
@@ -376,6 +398,8 @@ export const MemoryProvider = ({ children }) => {
     if (!user) return;
 
     try {
+      console.log("DEBUG: Flashcard - Resetting streak due to incorrect answer");
+      
       // Get current streak data for best streak
       const { data, error } = await supabase
         .from('streak_data')
@@ -389,7 +413,9 @@ export const MemoryProvider = ({ children }) => {
       }
 
       const today = new Date().toISOString().split('T')[0];
-      const bestStreak = data?.flashcard_all_time_high || data?.flashcard_streak || 0;
+      const bestStreak = data?.flashcard_all_time_high || 0;
+
+      console.log("DEBUG: Flashcard - Resetting current streak to 0. Best streak remains:", bestStreak);
 
       // Reset current streak to 0
       const { error: updateError } = await supabase
@@ -399,12 +425,16 @@ export const MemoryProvider = ({ children }) => {
           flashcard_current_streak: 0,
           flashcard_all_time_high: bestStreak,
           last_flashcard_date: today
+        }, {
+          onConflict: 'user_id'
         });
 
       if (updateError) {
         console.error('Error resetting flashcard streak:', updateError);
         return;
       }
+
+      console.log("DEBUG: Flashcard - Successfully reset streak in DB");
 
       // Update local state
       setStreaks(prev => ({
