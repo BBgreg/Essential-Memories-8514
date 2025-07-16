@@ -40,7 +40,7 @@ export const MemoryProvider = ({ children }) => {
 
   const loadMemories = async () => {
     if (!user) return;
-    
+
     try {
       setLoading(true);
       setError(null);
@@ -104,14 +104,20 @@ export const MemoryProvider = ({ children }) => {
 
       if (data) {
         setStreaks({
-          questionOfDay: { 
-            current: data.question_of_day_streak || 0, 
-            best: data.question_of_day_streak || 0 
+          questionOfDay: {
+            current: data.question_of_day_streak || 0,
+            best: data.question_of_day_best_streak || data.question_of_day_streak || 0,
+            lastDate: data.last_qod_date
           },
-          flashcard: { 
-            current: data.flashcard_streak || 0, 
-            best: data.flashcard_streak || 0 
+          flashcard: {
+            current: data.flashcard_current_streak || 0,
+            best: data.flashcard_all_time_high || data.flashcard_streak || 0
           }
+        });
+        
+        console.log('DEBUG: Loaded streaks from DB:', {
+          flashcardCurrent: data.flashcard_current_streak || 0,
+          flashcardBest: data.flashcard_all_time_high || data.flashcard_streak || 0
         });
       }
     } catch (error) {
@@ -184,7 +190,6 @@ export const MemoryProvider = ({ children }) => {
       setError(null);
 
       const updateData = {};
-      
       if (updates.name) updateData.name = updates.name;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
       if (updates.type) updateData.category = updates.type;
@@ -209,16 +214,13 @@ export const MemoryProvider = ({ children }) => {
       }
 
       // Update local state
-      setMemories(prev => prev.map(memory => 
-        memory.id === memoryId 
-          ? {
-              ...memory,
-              name: data.name,
-              date: `${String(data.month).padStart(2, '0')}/${String(data.day).padStart(2, '0')}`,
-              type: data.category,
-              notes: data.notes
-            }
-          : memory
+      setMemories(prev => prev.map(memory => memory.id === memoryId ? {
+        ...memory,
+        name: data.name,
+        date: `${String(data.month).padStart(2, '0')}/${String(data.day).padStart(2, '0')}`,
+        type: data.category,
+        notes: data.notes
+      } : memory
       ));
 
       return data;
@@ -265,6 +267,7 @@ export const MemoryProvider = ({ children }) => {
     if (!user) return;
 
     try {
+      // First, record the practice session
       const { error } = await supabase
         .from('practice_sessions')
         .insert([
@@ -282,19 +285,20 @@ export const MemoryProvider = ({ children }) => {
       }
 
       // Update local memory state
-      setMemories(prev => prev.map(memory => 
-        memory.id === memoryId 
-          ? {
-              ...memory,
-              correctCount: correct ? memory.correctCount + 1 : memory.correctCount,
-              incorrectCount: correct ? memory.incorrectCount : memory.incorrectCount + 1
-            }
-          : memory
+      setMemories(prev => prev.map(memory => memory.id === memoryId ? {
+        ...memory,
+        correctCount: correct ? memory.correctCount + 1 : memory.correctCount,
+        incorrectCount: correct ? memory.incorrectCount : memory.incorrectCount + 1
+      } : memory
       ));
 
       // Update streak if correct
       if (correct) {
         await updateFlashcardStreak();
+      } else {
+        // Reset streak on incorrect answer
+        await resetFlashcardStreak();
+        console.log("DEBUG: Flashcard - Incorrect answer. Resetting current streak to 0.");
       }
     } catch (error) {
       console.error('Error in submitFlashcardAnswer:', error);
@@ -305,8 +309,9 @@ export const MemoryProvider = ({ children }) => {
     if (!user) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
+      console.log("DEBUG: Flashcard - Fetching initial streaks for user:", user.id);
       
+      // Get current streak data
       const { data, error } = await supabase
         .from('streak_data')
         .select('*')
@@ -318,41 +323,99 @@ export const MemoryProvider = ({ children }) => {
         return;
       }
 
-      let newStreak = 1;
-      if (data && data.last_flashcard_date) {
-        const lastDate = new Date(data.last_flashcard_date);
-        const todayDate = new Date(today);
-        const daysDiff = Math.floor((todayDate - lastDate) / (1000 * 60 * 60 * 24));
-        
-        if (daysDiff === 1) {
-          newStreak = (data.flashcard_streak || 0) + 1;
-        } else if (daysDiff === 0) {
-          newStreak = data.flashcard_streak || 1;
+      const today = new Date().toISOString().split('T')[0];
+      let currentStreak = 1;
+      let bestStreak = data?.flashcard_all_time_high || data?.flashcard_streak || 0;
+
+      // If we have existing streak data
+      if (data) {
+        // Check if there's a current streak to continue
+        if (data.flashcard_current_streak) {
+          currentStreak = (data.flashcard_current_streak || 0) + 1;
+          console.log("DEBUG: Flashcard - Correct answer. Incrementing current streak to:", currentStreak);
+        }
+
+        // Update best streak if current is higher
+        if (currentStreak > bestStreak) {
+          bestStreak = currentStreak;
+          console.log("DEBUG: Flashcard - New best streak achieved:", bestStreak);
         }
       }
 
+      // Update streak data in Supabase
       const { error: updateError } = await supabase
         .from('streak_data')
-        .update({
-          flashcard_streak: newStreak,
+        .upsert({
+          user_id: user.id,
+          flashcard_current_streak: currentStreak,
+          flashcard_all_time_high: bestStreak,
           last_flashcard_date: today
-        })
-        .eq('user_id', user.id);
+        });
 
       if (updateError) {
         console.error('Error updating flashcard streak:', updateError);
         return;
       }
 
+      console.log("DEBUG: Flashcard - Persisting streaks to DB: Current", currentStreak, "Best", bestStreak);
+
+      // Update local state
       setStreaks(prev => ({
         ...prev,
         flashcard: {
-          current: newStreak,
-          best: Math.max(prev.flashcard.best, newStreak)
+          current: currentStreak,
+          best: bestStreak
         }
       }));
     } catch (error) {
       console.error('Error in updateFlashcardStreak:', error);
+    }
+  };
+
+  const resetFlashcardStreak = async () => {
+    if (!user) return;
+
+    try {
+      // Get current streak data for best streak
+      const { data, error } = await supabase
+        .from('streak_data')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching streak data:', error);
+        return;
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const bestStreak = data?.flashcard_all_time_high || data?.flashcard_streak || 0;
+
+      // Reset current streak to 0
+      const { error: updateError } = await supabase
+        .from('streak_data')
+        .upsert({
+          user_id: user.id,
+          flashcard_current_streak: 0,
+          flashcard_all_time_high: bestStreak,
+          last_flashcard_date: today
+        });
+
+      if (updateError) {
+        console.error('Error resetting flashcard streak:', updateError);
+        return;
+      }
+
+      // Update local state
+      setStreaks(prev => ({
+        ...prev,
+        flashcard: {
+          current: 0,
+          best: bestStreak
+        }
+      }));
+    } catch (error) {
+      console.error('Error in resetFlashcardStreak:', error);
     }
   };
 
@@ -365,7 +428,6 @@ export const MemoryProvider = ({ children }) => {
 
       // Update question of day streak
       const today = new Date().toISOString().split('T')[0];
-      
       const { data, error } = await supabase
         .from('streak_data')
         .select('*')
@@ -378,11 +440,13 @@ export const MemoryProvider = ({ children }) => {
       }
 
       let newStreak = correct ? 1 : 0;
+      let bestStreak = data?.question_of_day_best_streak || data?.question_of_day_streak || 0;
+
       if (data && data.last_qod_date && correct) {
         const lastDate = new Date(data.last_qod_date);
         const todayDate = new Date(today);
         const daysDiff = Math.floor((todayDate - lastDate) / (1000 * 60 * 60 * 24));
-        
+
         if (daysDiff === 1) {
           newStreak = (data.question_of_day_streak || 0) + 1;
         } else if (daysDiff === 0) {
@@ -390,13 +454,19 @@ export const MemoryProvider = ({ children }) => {
         }
       }
 
+      // Update best streak if current is higher
+      if (newStreak > bestStreak) {
+        bestStreak = newStreak;
+      }
+
       const { error: updateError } = await supabase
         .from('streak_data')
-        .update({
+        .upsert({
+          user_id: user.id,
           question_of_day_streak: newStreak,
+          question_of_day_best_streak: bestStreak,
           last_qod_date: today
-        })
-        .eq('user_id', user.id);
+        });
 
       if (updateError) {
         console.error('Error updating question of day streak:', updateError);
@@ -407,7 +477,8 @@ export const MemoryProvider = ({ children }) => {
         ...prev,
         questionOfDay: {
           current: newStreak,
-          best: Math.max(prev.questionOfDay.best, newStreak)
+          best: bestStreak,
+          lastDate: today
         }
       }));
     } catch (error) {
@@ -432,12 +503,12 @@ export const MemoryProvider = ({ children }) => {
 
     return memories.map(memory => {
       const [month, day] = memory.date.split('/').map(Number);
-      
+
       // Calculate days until next occurrence
       let daysUntil;
       const thisYear = new Date(today.getFullYear(), month - 1, day);
       const nextYear = new Date(today.getFullYear() + 1, month - 1, day);
-      
+
       if (thisYear >= today) {
         daysUntil = Math.ceil((thisYear - today) / (1000 * 60 * 60 * 24));
       } else {

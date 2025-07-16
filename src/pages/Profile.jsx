@@ -78,15 +78,6 @@ const Profile = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {}}
-              className="bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-4 rounded-2xl font-semibold shadow-lg"
-            >
-              Edit Profile
-            </motion.button>
-            
             <Link to="/update-password">
               <motion.button
                 whileHover={{ scale: 1.02 }}
