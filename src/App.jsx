@@ -5,147 +5,195 @@ import { MemoryProvider } from './contexts/MemoryContext';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 
-// Import pages
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Home from './pages/Home';
-import AddMemory from './pages/AddMemory';
-import Calendar from './pages/Calendar';
-import Flashcards from './pages/Flashcards';
-import Statistics from './pages/Statistics';
-import Profile from './pages/Profile';
-import ForgotPassword from './pages/ForgotPassword';
-import UpdatePassword from './pages/UpdatePassword';
-import Terms from './pages/Terms';
-import Privacy from './pages/Privacy';
+// Add global error handling
+window.onerror = (message, source, lineno, colno, error) => {
+  console.error("DEBUG: App.jsx - Uncaught Global Error:", { message, source, lineno, colno, error });
+  return false;
+};
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error("DEBUG: App.jsx - Unhandled Promise Rejection:", event.reason);
+});
+
+console.log("DEBUG: App.jsx - Starting to load page components");
+
+// Import pages with error handling
+let Login, Signup, Home, AddMemory, Calendar, Flashcards, Profile, ForgotPassword, UpdatePassword, Terms, Privacy;
+
+try {
+  Login = React.lazy(() => {
+    console.log("DEBUG: App.jsx - Loading Login component");
+    return import('./pages/Login').then(module => {
+      console.log("DEBUG: App.jsx - Login component loaded successfully");
+      return module;
+    }).catch(error => {
+      console.error("DEBUG: App.jsx - Failed to load Login component:", error);
+      throw error;
+    });
+  });
+
+  Signup = React.lazy(() => import('./pages/Signup'));
+  Home = React.lazy(() => import('./pages/Home'));
+  AddMemory = React.lazy(() => import('./pages/AddMemory'));
+  Calendar = React.lazy(() => import('./pages/Calendar'));
+  Flashcards = React.lazy(() => import('./pages/Flashcards'));
+  Profile = React.lazy(() => import('./pages/Profile'));
+  ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
+  UpdatePassword = React.lazy(() => import('./pages/UpdatePassword'));
+  Terms = React.lazy(() => import('./pages/Terms'));
+  Privacy = React.lazy(() => import('./pages/Privacy'));
+
+  console.log("DEBUG: App.jsx - All page components set up for lazy loading");
+} catch (error) {
+  console.error("DEBUG: App.jsx - Error setting up lazy loading:", error);
+}
 
 // Styles
 import './App.css';
 
-// Debug component to wrap routes for debugging
-const DebugRoute = ({ children, path }) => {
-  console.log(`DEBUG: Rendering route: ${path}`);
-  return <>{children}</>;
-};
-
-// Error fallback for the Add Memory page
-const AddMemoryErrorFallback = ({ error }) => {
-  console.error("DEBUG: AddMemory Error Fallback triggered", error);
+const LoadingFallback = ({ componentName }) => {
+  console.log(`DEBUG: App.jsx - Loading fallback for ${componentName}`);
   return (
-    <div className="p-6 space-y-6">
-      <div className="bg-red-50 text-red-600 rounded-xl p-4 flex items-center">
-        <p className="text-sm">Error loading Add Memory page: {error?.message || "Unknown error"}</p>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p>Loading {componentName}...</p>
       </div>
-      <button 
-        onClick={() => window.location.reload()}
-        className="bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white py-2 px-4 rounded-xl"
-      >
-        Try Again
-      </button>
     </div>
   );
 };
 
-// Wrapper for the AddMemory component with error handling
-const AddMemoryWithErrorHandling = () => {
-  console.log("DEBUG: AddMemory wrapper rendering");
-  try {
-    return <AddMemory />;
-  } catch (error) {
-    console.error("DEBUG: Error caught in AddMemory wrapper", error);
-    return <AddMemoryErrorFallback error={error} />;
-  }
-};
-
 function App() {
-  console.log("DEBUG: App component rendering");
-  
+  console.log("DEBUG: App.jsx - App component rendering");
+
   return (
     <ErrorBoundary>
-      <Router>
-        <AuthProvider>
-          <MemoryProvider>
+      <AuthProvider>
+        <MemoryProvider>
+          <Router>
             <Layout>
-              <Routes>
-                <Route path="/" element={
-                  <DebugRoute path="/">
-                    <Navigate to="/login" replace />
-                  </DebugRoute>
-                } />
-                <Route path="/login" element={
-                  <DebugRoute path="/login">
-                    <Login />
-                  </DebugRoute>
-                } />
-                <Route path="/signup" element={
-                  <DebugRoute path="/signup">
-                    <Signup />
-                  </DebugRoute>
-                } />
-                <Route path="/forgot-password" element={
-                  <DebugRoute path="/forgot-password">
-                    <ForgotPassword />
-                  </DebugRoute>
-                } />
-                <Route path="/update-password" element={
-                  <DebugRoute path="/update-password">
-                    <UpdatePassword />
-                  </DebugRoute>
-                } />
-                <Route path="/terms" element={
-                  <DebugRoute path="/terms">
-                    <Terms />
-                  </DebugRoute>
-                } />
-                <Route path="/privacy" element={
-                  <DebugRoute path="/privacy">
-                    <Privacy />
-                  </DebugRoute>
-                } />
-                <Route path="/home" element={
-                  <DebugRoute path="/home">
-                    <Home />
-                  </DebugRoute>
-                } />
-                <Route path="/add" element={
-                  <DebugRoute path="/add">
-                    <ErrorBoundary>
-                      <AddMemoryWithErrorHandling />
-                    </ErrorBoundary>
-                  </DebugRoute>
-                } />
-                <Route path="/calendar" element={
-                  <DebugRoute path="/calendar">
-                    <Calendar />
-                  </DebugRoute>
-                } />
-                <Route path="/flashcards" element={
-                  <DebugRoute path="/flashcards">
-                    <Flashcards />
-                  </DebugRoute>
-                } />
-                <Route path="/statistics" element={
-                  <DebugRoute path="/statistics">
-                    <Statistics />
-                  </DebugRoute>
-                } />
-                <Route path="/profile" element={
-                  <DebugRoute path="/profile">
-                    <Profile />
-                  </DebugRoute>
-                } />
-                <Route path="*" element={
-                  <DebugRoute path="*">
-                    <Navigate to="/login" replace />
-                  </DebugRoute>
-                } />
-              </Routes>
+              <React.Suspense fallback={<LoadingFallback componentName="page" />}>
+                <Routes>
+                  <Route 
+                    path="/" 
+                    element={
+                      (() => {
+                        console.log("DEBUG: App.jsx - Router processing root path, redirecting to /login");
+                        return <Navigate to="/login" replace />;
+                      })()
+                    } 
+                  />
+                  <Route 
+                    path="/login" 
+                    element={
+                      (() => {
+                        console.log("DEBUG: App.jsx - Router processing /login route");
+                        return (
+                          <React.Suspense fallback={<LoadingFallback componentName="Login" />}>
+                            <Login />
+                          </React.Suspense>
+                        );
+                      })()
+                    } 
+                  />
+                  <Route 
+                    path="/signup" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="Signup" />}>
+                        <Signup />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/forgot-password" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="ForgotPassword" />}>
+                        <ForgotPassword />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/update-password" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="UpdatePassword" />}>
+                        <UpdatePassword />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/terms" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="Terms" />}>
+                        <Terms />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/privacy" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="Privacy" />}>
+                        <Privacy />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/home" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="Home" />}>
+                        <Home />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/add" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="AddMemory" />}>
+                        <AddMemory />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/calendar" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="Calendar" />}>
+                        <Calendar />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/flashcards" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="Flashcards" />}>
+                        <Flashcards />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="/profile" 
+                    element={
+                      <React.Suspense fallback={<LoadingFallback componentName="Profile" />}>
+                        <Profile />
+                      </React.Suspense>
+                    } 
+                  />
+                  <Route 
+                    path="*" 
+                    element={
+                      (() => {
+                        console.log("DEBUG: App.jsx - Router processing catch-all route, redirecting to /login");
+                        return <Navigate to="/login" replace />;
+                      })()
+                    } 
+                  />
+                </Routes>
+              </React.Suspense>
             </Layout>
-          </MemoryProvider>
-        </AuthProvider>
-      </Router>
+          </Router>
+        </MemoryProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
 
+console.log("DEBUG: App.jsx - App component defined successfully");
 export default App;

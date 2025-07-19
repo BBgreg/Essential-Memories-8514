@@ -8,6 +8,8 @@ import SafeIcon from '../common/SafeIcon';
 const { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle } = FiIcons;
 
 const Login = () => {
+  console.log("DEBUG: Login component - Starting render");
+  
   const navigate = useNavigate();
   const { signIn, user, loading, authError, clearAuthError } = useAuth();
   const [email, setEmail] = useState('');
@@ -15,40 +17,67 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  console.log("DEBUG: Login component - State initialized", {
+    user: user?.id || 'none',
+    loading,
+    authError: authError || 'none'
+  });
+
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
+    console.log("DEBUG: Login component - useEffect for user redirect", { user: user?.id, loading });
+    if (user && !loading) {
+      console.log("DEBUG: Login component - User logged in, redirecting to /home");
       navigate('/home');
     }
-  }, [user, navigate]);
+  }, [user, navigate, loading]);
 
   // Clear any auth errors when the component unmounts
   useEffect(() => {
+    console.log("DEBUG: Login component - Setting up cleanup effect");
     return () => {
+      console.log("DEBUG: Login component - Cleanup: clearing auth error");
       clearAuthError();
     };
   }, [clearAuthError]);
 
   const handleSubmit = async (e) => {
+    console.log("DEBUG: Login component - Form submit started");
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      console.log("DEBUG: Login component - Attempting sign in with email:", email);
       const { user: loggedInUser, error } = await signIn(email, password);
       
       if (loggedInUser && !error) {
+        console.log("DEBUG: Login component - Sign in successful, navigating to /home");
         navigate('/home');
+      } else {
+        console.log("DEBUG: Login component - Sign in failed:", error);
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('DEBUG: Login component - Sign in error:', error);
     } finally {
       setIsSubmitting(false);
+      console.log("DEBUG: Login component - Form submit completed");
     }
   };
 
+  // Show loading state while auth is being checked
   if (loading) {
-    return null; // Will show the LoadingScreen from Layout
+    console.log("DEBUG: Login component - Rendering loading state");
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
   }
+
+  console.log("DEBUG: Login component - Rendering main login form");
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -147,4 +176,5 @@ const Login = () => {
   );
 };
 
+console.log("DEBUG: Login component - Module loaded successfully");
 export default Login;

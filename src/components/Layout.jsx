@@ -4,7 +4,11 @@ import Navbar from './Navbar';
 import ConfettiBackground from './ConfettiBackground';
 import { useLocation } from 'react-router-dom';
 
+console.log("DEBUG: Layout.jsx - Component loading");
+
 const Layout = ({ children }) => {
+  console.log("DEBUG: Layout.jsx - Layout component rendering");
+  
   const location = useLocation();
 
   // Don't show navbar on auth pages
@@ -18,10 +22,11 @@ const Layout = ({ children }) => {
     '/' // Added root path as an auth page
   ].includes(location.pathname);
 
+  console.log("DEBUG: Layout.jsx - Current path:", location.pathname, "isAuthPage:", isAuthPage);
+
   return (
     <div className="app-container min-h-screen relative">
       <ConfettiBackground />
-      
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -35,4 +40,5 @@ const Layout = ({ children }) => {
   );
 };
 
+console.log("DEBUG: Layout.jsx - Component loaded successfully");
 export default Layout;

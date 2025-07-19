@@ -22,7 +22,6 @@ const AddMemory = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Verify user authentication
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -51,22 +50,18 @@ const AddMemory = () => {
 
     setIsSubmitting(true);
     setError('');
-
+    
     try {
-      console.log('Adding memory with user ID:', user.id);
-      console.log('Memory data:', formData);
-      
       await addMemory({
         ...formData,
-        userId: user.id // Explicitly pass the user ID to ensure it's used in the database operation
+        userId: user.id
       });
       
       setShowSuccess(true);
       setTimeout(() => {
-        navigate('/');
+        navigate('/home');
       }, 2000);
     } catch (error) {
-      console.error('Error adding memory:', error);
       setError(error.message || 'Failed to add memory. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -74,7 +69,10 @@ const AddMemory = () => {
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   if (showSuccess) {
@@ -99,7 +97,6 @@ const AddMemory = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center space-x-4">
         <motion.button
           whileHover={{ scale: 1.1 }}
@@ -115,7 +112,6 @@ const AddMemory = () => {
         </div>
       </div>
 
-      {/* Error Message */}
       {error && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -127,14 +123,12 @@ const AddMemory = () => {
         </motion.div>
       )}
 
-      {/* Form */}
       <motion.form
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         onSubmit={handleSubmit}
         className="space-y-6"
       >
-        {/* Name Input */}
         <div className="space-y-2">
           <label className="text-text-primary font-semibold">
             {formData.type === 'birthday' ? "Person's Name" : 'Name'}
@@ -154,14 +148,12 @@ const AddMemory = () => {
           )}
         </div>
 
-        {/* Date Field */}
         <DateField
           value={formData.date}
           onChange={(date) => handleChange('date', date)}
           label="Date (MM/DD)"
         />
 
-        {/* Type Selection */}
         <div className="space-y-3">
           <label className="text-text-primary font-semibold">Type</label>
           <div className="grid grid-cols-2 gap-3">
@@ -187,7 +179,6 @@ const AddMemory = () => {
           </div>
         </div>
 
-        {/* Submit Button */}
         <motion.button
           type="submit"
           whileHover={{ scale: 1.02 }}

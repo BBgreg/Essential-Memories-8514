@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMemory } from '../contexts/MemoryContext';
-import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  getMonth,
-  isSameDay,
-  addMonths,
-  subMonths
-} from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
@@ -21,6 +12,7 @@ const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDateMemories, setSelectedDateMemories] = useState([]);
+  const [highlightedMemory, setHighlightedMemory] = useState(null);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -58,6 +50,28 @@ const Calendar = () => {
     }
   };
 
+  const getTypeGradient = (type) => {
+    switch (type) {
+      case 'birthday': return 'from-pink-200 to-pink-300';
+      case 'anniversary': return 'from-teal-200 to-teal-300';
+      case 'special': return 'from-yellow-200 to-yellow-300';
+      case 'holiday': return 'from-purple-200 to-purple-300';
+      default: return 'from-gray-200 to-gray-300';
+    }
+  };
+
+  const getPriorityType = (memories) => {
+    if (!memories || memories.length === 0) return null;
+    // Priority order: birthday > anniversary > special > holiday
+    const priorities = ['birthday', 'anniversary', 'special', 'holiday'];
+    for (const priority of priorities) {
+      if (memories.some(m => m.type === priority)) {
+        return priority;
+      }
+    }
+    return memories[0].type;
+  };
+
   const navigateMonth = (direction) => {
     setCurrentDate(prev => (direction === 'next' ? addMonths(prev, 1) : subMonths(prev, 1)));
   };
@@ -82,17 +96,43 @@ const Calendar = () => {
     try {
       // Parse MM/DD format
       const [month, day] = dateString.split('/').map(Number);
-      
       // Create a date using current year
       const date = new Date();
       date.setMonth(month - 1);
       date.setDate(day);
-      
       return format(date, 'MMM d');
     } catch (error) {
       return dateString;
     }
   };
+
+  // Format a date for the popup display
+  const formatFullDate = (memory) => {
+    try {
+      // Parse MM/DD format
+      const [month, day] = memory.date.split('/').map(Number);
+      // Create a date using current year
+      const date = new Date();
+      date.setMonth(month - 1);
+      date.setDate(day);
+      // Format based on memory type
+      if (memory.type === 'birthday') {
+        return `${memory.title}'s Birthday on ${format(date, 'MMMM d')}`;
+      } else {
+        return `${memory.title} on ${format(date, 'MMMM d')}`;
+      }
+    } catch (error) {
+      return memory.title;
+    }
+  };
+
+  // Handle mouseover for highlighting memory details
+  const handleMemoryHover = (memory) => {
+    setHighlightedMemory(memory);
+  };
+
+  // Log for debugging
+  console.log("DEBUG: Calendar - Rendering calendar with", memories.length, "memories");
 
   return (
     <div className="p-6 space-y-6">
@@ -130,7 +170,10 @@ const Calendar = () => {
         {/* Week Days Header */}
         <div className="grid grid-cols-7 gap-1 mb-4">
           {weekDays.map(day => (
-            <div key={day} className="text-center text-text-secondary font-medium text-sm py-2">
+            <div
+              key={day}
+              className="text-center text-text-secondary font-medium text-sm py-2"
+            >
               {day}
             </div>
           ))}
@@ -142,21 +185,22 @@ const Calendar = () => {
             const dayMemories = getMemoriesForDate(day);
             const isToday = isSameDay(day, new Date());
             const hasEvents = dayMemories.length > 0;
-
+            const priorityType = getPriorityType(dayMemories);
+            
             // Get the color for the date box based on the event type
             let eventTypeColor = '';
-            if (hasEvents) {
-              // If there are multiple events, prioritize by type
-              const types = dayMemories.map(m => m.type);
-              if (types.includes('birthday')) {
-                eventTypeColor = getTypeColor('birthday');
-              } else if (types.includes('anniversary')) {
-                eventTypeColor = getTypeColor('anniversary');
-              } else if (types.includes('special')) {
-                eventTypeColor = getTypeColor('special');
-              } else if (types.includes('holiday')) {
-                eventTypeColor = getTypeColor('holiday');
-              }
+            let eventGradient = '';
+            if (hasEvents && priorityType) {
+              eventTypeColor = getTypeColor(priorityType);
+              eventGradient = getTypeGradient(priorityType);
+              console.log(
+                "DEBUG: Calendar - Applying color to date box:",
+                format(day, 'MM/dd'),
+                "Category:",
+                priorityType,
+                "Color:",
+                eventTypeColor
+              );
             }
 
             return (
@@ -166,24 +210,37 @@ const Calendar = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.01 }}
                 onClick={() => handleDateClick(day)}
-                className={`aspect-square p-2 rounded-xl border border-gray-100 relative cursor-pointer 
-                  ${hasEvents ? 'hover:shadow-md transition-shadow' : ''}
-                  ${isToday 
+                onMouseEnter={() => hasEvents && handleMemoryHover(dayMemories[0])}
+                onMouseLeave={() => setHighlightedMemory(null)}
+                className={`aspect-square p-2 rounded-xl border border-gray-100 relative cursor-pointer ${
+                  hasEvents ? 'hover:shadow-md transition-shadow' : ''
+                } ${
+                  isToday 
                     ? 'bg-gradient-to-r from-vibrant-pink to-vibrant-teal text-white' 
-                    : hasEvents ? eventTypeColor : 'bg-white/50'}`}
+                    : hasEvents 
+                      ? `bg-gradient-to-r ${eventGradient}` 
+                      : 'bg-white/50'
+                }`}
               >
                 <div className="flex flex-col h-full">
-                  <span
-                    className={`text-sm font-medium 
-                      ${isToday 
-                        ? 'text-white' 
-                        : hasEvents ? 'text-text-primary' : 'text-text-secondary'}`}
-                  >
+                  <span className={`text-sm font-medium ${
+                    isToday 
+                      ? 'text-white' 
+                      : hasEvents 
+                        ? 'text-text-primary' 
+                        : 'text-text-secondary'
+                  }`}>
                     {format(day, 'd')}
                   </span>
                   {hasEvents && (
                     <div className="flex justify-center mt-1">
-                      <div className="w-2 h-2 rounded-full bg-white/70"></div>
+                      {dayMemories.length > 1 ? (
+                        <span className="text-xs font-medium">
+                          {dayMemories.length} events
+                        </span>
+                      ) : (
+                        <div className="w-2 h-2 rounded-full bg-white/70"></div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -192,6 +249,20 @@ const Calendar = () => {
           })}
         </div>
       </div>
+
+      {/* Highlighted Memory */}
+      {highlightedMemory && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className={`bg-gradient-to-r ${getTypeGradient(highlightedMemory.type)} p-4 rounded-xl shadow-md mb-4 text-center`}
+        >
+          <p className="font-semibold text-text-primary">
+            {getDisplayName(highlightedMemory)} • {formatDate(highlightedMemory.date)}
+          </p>
+        </motion.div>
+      )}
 
       {/* Calendar Legend */}
       <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
@@ -214,6 +285,7 @@ const Calendar = () => {
             <span className="text-sm text-text-secondary">Holiday</span>
           </div>
         </div>
+        {console.log("DEBUG: Calendar - Legend rendered. (Change 2.2)")}
       </div>
 
       {/* Memories List for Current Month */}
@@ -297,6 +369,7 @@ const Calendar = () => {
               >
                 <SafeIcon icon={FiX} className="w-5 h-5 text-text-secondary" />
               </button>
+
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gradient-to-r from-vibrant-pink to-vibrant-teal rounded-full flex items-center justify-center mx-auto mb-4">
                   <SafeIcon icon={FiCalendar} className="w-8 h-8 text-white" />
@@ -308,6 +381,7 @@ const Calendar = () => {
                   {selectedDateMemories.length} {selectedDateMemories.length === 1 ? 'event' : 'events'}
                 </p>
               </div>
+
               <div className="space-y-4">
                 {selectedDateMemories.map(memory => (
                   <div
@@ -320,12 +394,13 @@ const Calendar = () => {
                       </div>
                       <div>
                         <p className="font-semibold text-text-primary">{getDisplayName(memory)}</p>
-                        <p className="text-sm text-text-secondary capitalize">{memory.type}</p>
+                        <p className="text-sm text-text-secondary">{formatFullDate(memory)}</p>
                         <p className="text-xs text-text-secondary">{memory.date} (MM/DD)</p>
                       </div>
                     </div>
                   </div>
                 ))}
+
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}

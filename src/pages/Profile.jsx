@@ -5,19 +5,25 @@ import { useAuth } from '../contexts/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiArrowLeft, FiUser, FiMail, FiLock, FiLogOut } = FiIcons;
+const { FiArrowLeft, FiUser, FiMail, FiLogOut } = FiIcons;
 
 const Profile = () => {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
-  
+
   const handleSignOut = async () => {
-    console.log('Sign out requested');
+    console.log('DEBUG: Sign out initiated. (Change 1)');
     try {
-      await signOut();
-      navigate('/login');
+      const result = await signOut();
+      console.log('DEBUG: Sign out result (Change 1):', result);
+      
+      // Always redirect to login page after sign out, regardless of result
+      console.log('DEBUG: Redirecting to login page after sign out. (Change 1)');
+      navigate('/login', { replace: true });
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('DEBUG: Sign out error (Change 1):', error);
+      // Still redirect to login on error for security
+      navigate('/login', { replace: true });
     }
   };
 
@@ -66,6 +72,7 @@ const Profile = () => {
                 </p>
               </div>
             </div>
+
             <div className="bg-gray-50 p-4 rounded-2xl">
               <p className="text-sm text-text-secondary mb-1">Email Address</p>
               <div className="flex items-center">
@@ -78,25 +85,13 @@ const Profile = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            <Link to="/update-password">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full bg-white border border-gray-200 text-text-primary py-4 rounded-2xl font-semibold flex items-center justify-center space-x-2"
-              >
-                <SafeIcon icon={FiLock} className="w-5 h-5" />
-                <span>Change Password</span>
-              </motion.button>
-            </Link>
-
             <Link to="/terms" className="text-vibrant-pink text-center font-medium hover:underline py-2">
               Terms of Service
             </Link>
-            
             <Link to="/privacy" className="text-vibrant-pink text-center font-medium hover:underline py-2">
               Privacy Policy
             </Link>
-            
+
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}

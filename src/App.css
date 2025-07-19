@@ -101,3 +101,37 @@
 .mm-dd-input input:focus + .mm-dd-placeholder {
   display: none;
 }
+
+/* Flashcard Flip Animation */
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Enhanced Calendar Styles */
+.calendar-date {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.calendar-date:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-legend-color {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+}

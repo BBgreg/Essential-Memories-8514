@@ -7,31 +7,29 @@ import MonthDayPicker from './MonthDayPicker';
 const { FiCalendar } = FiIcons;
 
 const DateField = ({ value, onChange, label }) => {
-  console.log("DEBUG: DateField component rendering with value:", value);
-  
   const [showPicker, setShowPicker] = React.useState(false);
 
   const handleIconClick = (e) => {
+    console.log("DEBUG: DateField - Calendar icon clicked, opening picker");
     e.preventDefault();
     e.stopPropagation();
-    console.log("DEBUG: DateField - Calendar icon clicked, showing picker");
     setShowPicker(true);
   };
 
-  // Format for display
+  const handleDateChange = (selectedDate) => {
+    console.log("DEBUG: DateField - Date selected from picker:", selectedDate);
+    onChange(selectedDate);
+    setShowPicker(false);
+  };
+
   const formatDisplayValue = (value) => {
     if (!value) return '';
-    // Value is already in MM/DD format
-    return value;
+    return value; // Already in MM/DD format
   };
 
   return (
     <div className="space-y-2">
-      <label className="text-text-primary font-semibold">
-        {label || 'Date (Month/Day)'}
-      </label>
       <div className="relative">
-        {/* Read-only display field */}
         <input
           type="text"
           readOnly
@@ -39,10 +37,11 @@ const DateField = ({ value, onChange, label }) => {
           className={`
             w-full p-4 rounded-2xl border border-gray-200 bg-white/60 backdrop-blur-sm
             ${value ? 'text-text-primary' : 'text-text-secondary'}
-            cursor-default
+            cursor-pointer
           `}
+          onClick={handleIconClick}
+          placeholder="Click to select date"
         />
-        {/* Calendar icon button */}
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -53,19 +52,12 @@ const DateField = ({ value, onChange, label }) => {
         </motion.button>
       </div>
 
-      {/* Calendar Picker Modal */}
       <AnimatePresence>
         {showPicker && (
           <MonthDayPicker
             value={value}
-            onChange={(newDate) => {
-              console.log("DEBUG: DateField - Date selected:", newDate);
-              onChange(newDate);
-            }}
-            onClose={() => {
-              console.log("DEBUG: DateField - Picker closed");
-              setShowPicker(false);
-            }}
+            onChange={handleDateChange}
+            onClose={() => setShowPicker(false)}
           />
         )}
       </AnimatePresence>

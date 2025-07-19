@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { useMemory } from '../contexts/MemoryContext';
@@ -12,35 +12,25 @@ const MemoryCard = ({ memory, onEdit, onDelete, showActions = true }) => {
 
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'birthday':
-        return FiGift;
-      case 'anniversary':
-        return FiHeart;
-      case 'special':
-        return FiStar;
-      default:
-        return FiCalendar;
+      case 'birthday': return FiGift;
+      case 'anniversary': return FiHeart;
+      case 'special': return FiStar;
+      default: return FiCalendar;
     }
   };
 
   const getTypeColor = (type) => {
     switch (type) {
-      case 'birthday':
-        return 'from-pastel-pink to-vibrant-pink';
-      case 'anniversary':
-        return 'from-pastel-teal to-vibrant-teal';
-      case 'special':
-        return 'from-pastel-yellow to-vibrant-yellow';
-      default:
-        return 'from-pastel-purple to-vibrant-purple';
+      case 'birthday': return 'from-pastel-pink to-vibrant-pink';
+      case 'anniversary': return 'from-pastel-teal to-vibrant-teal';
+      case 'special': return 'from-pastel-yellow to-vibrant-yellow';
+      default: return 'from-pastel-purple to-vibrant-purple';
     }
   };
 
   const formatDate = (dateString) => {
     try {
-      // Parse MM/DD format
       const [month, day] = dateString.split('/');
-      // Create a date using current year
       const date = new Date();
       date.setMonth(parseInt(month) - 1);
       date.setDate(parseInt(day));
@@ -56,7 +46,6 @@ const MemoryCard = ({ memory, onEdit, onDelete, showActions = true }) => {
     return Math.round((memory.correctCount / total) * 100);
   };
 
-  // Get the proper display name (with "'s Birthday" for birthdays)
   const displayName = getDisplayName(memory);
 
   return (
@@ -100,16 +89,10 @@ const MemoryCard = ({ memory, onEdit, onDelete, showActions = true }) => {
 
       <div className="flex justify-between items-center text-sm">
         <div className="flex space-x-4">
-          <span className="text-green-600 font-medium">
-            ✓ {memory.correctCount}
-          </span>
-          <span className="text-red-600 font-medium">
-            ✗ {memory.incorrectCount}
-          </span>
+          <span className="text-green-600 font-medium">✓ {memory.correctCount}</span>
+          <span className="text-red-600 font-medium">✗ {memory.incorrectCount}</span>
         </div>
-        <div className="text-text-secondary">
-          {getAccuracy()}% accuracy
-        </div>
+        <div className="text-text-secondary">{getAccuracy()}% accuracy</div>
       </div>
 
       <div className="mt-3 bg-gray-200 rounded-full h-2 overflow-hidden">

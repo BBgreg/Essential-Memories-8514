@@ -6,55 +6,29 @@ import { refreshSession } from '../lib/supabase';
 
 const { FiLoader, FiAlertCircle, FiRefreshCw } = FiIcons;
 
-const LoadingScreen = ({ 
-  message = 'Loading your memories...', 
-  error = null, 
-  onRetry = null, 
-  showRetry = false 
-}) => {
+const LoadingScreen = ({ message = 'Loading your memories...', error = null, onRetry = null, showRetry = false }) => {
   const [showRetryButton, setShowRetryButton] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
   const [refreshAttempted, setRefreshAttempted] = useState(false);
 
-  // Enhanced component lifecycle logging
-  useEffect(() => {
-    console.log('[LoadingScreen] Mounted with:', {
-      hasError: !!error,
-      message,
-      showRetry,
-      currentTime: new Date().toISOString()
-    });
-
-    return () => {
-      console.log('[LoadingScreen] Unmounted at:', new Date().toISOString());
-    };
-  }, [error, message, showRetry]);
-
-  // Show retry button after delay if still loading
   useEffect(() => {
     if (!error) {
       const timer = setTimeout(() => {
-        console.log('[LoadingScreen] Showing retry button after delay');
         setShowRetryButton(true);
       }, 3000);
-
       return () => clearTimeout(timer);
     }
   }, [error]);
 
-  // Track loading time and attempt auto-recovery
   useEffect(() => {
     const interval = setInterval(() => {
       setLoadingTime(prev => {
         const newTime = prev + 1;
-        console.log('[LoadingScreen] Loading time:', newTime, 'seconds');
         
-        // At 4 seconds, try auto-refreshing the session if we haven't already
         if (newTime === 4 && !refreshAttempted && !error) {
-          console.log('[LoadingScreen] Auto-attempting session refresh after 4s delay');
           setRefreshAttempted(true);
           refreshSession().then(success => {
-            console.log('[LoadingScreen] Auto session refresh result:', success ? 'Success' : 'Failed');
+            console.log('Auto session refresh result:', success ? 'Success' : 'Failed');
           });
         }
         
@@ -65,7 +39,6 @@ const LoadingScreen = ({
     return () => clearInterval(interval);
   }, [error, refreshAttempted]);
 
-  // Provide detailed error message for long loading times
   const getDetailedHelp = () => {
     if (loadingTime > 8) {
       return (
@@ -83,16 +56,10 @@ const LoadingScreen = ({
     return null;
   };
 
-  // Handle retry button click
   const handleRetry = () => {
-    console.log('[LoadingScreen] Retry requested after', loadingTime, 'seconds');
-    
-    // Call the provided retry function
     if (onRetry) onRetry();
     
-    // For very long loading times, force page reload
     if (loadingTime > 12) {
-      console.log('[LoadingScreen] Long loading time detected, forcing page reload');
       window.location.reload();
     }
   };
